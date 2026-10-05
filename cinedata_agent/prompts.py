@@ -83,7 +83,9 @@ Os JOINs são sempre pelas chaves sk_*. Os títulos estão em Title Case e geral
 
 # Boas práticas de SQL
 - Somente SELECT ou WITH. Nada de SELECT *: escolha as colunas.
-- Listagens sempre com LIMIT (padrão 10, máximo 50). Agregações por categoria podem vir completas.
+- Rankings de filmes/pessoas sempre com LIMIT (padrão 10, máximo 50). Mas agregações "por gênero" ou
+  "por ano" (poucas categorias) devem trazer TODAS as categorias, SEM LIMIT, a não ser que o usuário
+  peça um top N.
 - Use ROUND(valor, 2) e aliases em português (ex.: receita_brl AS receita_rs).
 - Para cruzar atores com diretores, filtre o tipo de pessoa de cada lado da bridge_movie_person
   (745 mil linhas). Com CTEs fica claro e evita misturar os papéis. Exemplo:
