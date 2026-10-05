@@ -4,7 +4,9 @@ Interface de linha de comando do agente CineData.
     python main.py                                  # modo conversa (com memória)
     python main.py "Top 10 filmes com maior receita"  # pergunta única
     python main.py --mostrar-sql                    # mostra o SQL e a tabela de cada consulta
-    python main.py --provedor ollama --modelo qwen3:4b   # roda com modelo local
+    python main.py --provedor ollama                # modelo local (Ollama)
+    python main.py --provedor nvidia                # API da NVIDIA (precisa de NVIDIA_API_KEY)
+    python main.py --provedor auto                  # OpenRouter -> NVIDIA -> Ollama
 
 Comandos dentro do chat: /nova  /sql  /cota  /exemplos  /ajuda  /sair
 """
@@ -80,7 +82,8 @@ def main():
     parser.add_argument("pergunta", nargs="*", help="pergunta única (sem isso abre o modo conversa)")
     parser.add_argument("--mostrar-sql", action="store_true", help="mostra SQL e resultado das consultas")
     parser.add_argument("--sem-cache", action="store_true", help="não usa o cache de respostas")
-    parser.add_argument("--provedor", choices=["openrouter", "ollama"], default=None)
+    parser.add_argument("--provedor", choices=list(config.PROVEDORES_VALIDOS), default=None,
+                        help="sobrescreve o PROVEDOR_LLM do .env")
     parser.add_argument("--modelo", default=None, help="força um modelo específico")
     args = parser.parse_args()
 

@@ -14,7 +14,8 @@ from cinedata_agent import config
 from cinedata_agent.agente import AgenteCineData
 from cinedata_agent.banco import banco_disponivel
 from cinedata_agent.graficos import para_dataframe, sugerir_grafico
-from cinedata_agent.llm import consultar_cota, resumo_cota
+from cinedata_agent.llm import consultar_cota, resumo_cota, status_provedores
+from langgraph.checkpoint.memory import InMemorySaver
 
 st.set_page_config(page_title="CineData Assistente", page_icon="🎬", layout="wide")
 
@@ -50,11 +51,26 @@ EXEMPLOS = {
 }
 
 
+ROTULOS_PROVEDOR = {
+    "auto": "Automático (OpenRouter → NVIDIA → Ollama)",
+    "openrouter": "OpenRouter (modelos :free)",
+    "nvidia": "NVIDIA (build.nvidia.com)",
+    "ollama": "Ollama (modelo local)",
+}
+
+
+@st.cache_resource
+def carregar_memoria() -> InMemorySaver:
+    # uma memória só para todos os provedores: dá pra trocar de provedor no
+    # meio da conversa sem perder o contexto
+    return InMemorySaver()
+
+
 @st.cache_resource(show_spinner="Carregando o agente...")
-def carregar_agente() -> AgenteCineData:
-    # cache_resource: o agente (e a memória das conversas) é criado uma vez só
-    # e reaproveitado entre as recargas da página
-    return AgenteCineData(usar_cache=True)
+def carregar_agente(provedor: str) -> AgenteCineData:
+    # cache_resource: cada agente é criado uma vez só e reaproveitado entre
+    # as recargas da página
+    return AgenteCineData(provedor=provedor, usar_cache=True, checkpointer=carregar_memoria())
 
 
 def iniciar_sessao():
@@ -117,6 +133,20 @@ with st.sidebar:
     st.title("🎬 CineData")
     st.caption("Agente Text-to-SQL sobre a camada Gold")
 
+    status = status_provedores()
+    opcoes = list(ROTULOS_PROVEDOR)
+    padrao = config.PROVEDOR_LLM if config.PROVEDOR_LLM in opcoes else "openrouter"
+
+    def _rotulo(p):
+        if p == "auto":
+            return ROTULOS_PROVEDOR[p]
+        return ("✅ " if status[p][0] else "⚪ ") + ROTULOS_PROVEDOR[p]
+
+    provedor = st.selectbox("Provedor do LLM", opcoes, index=opcoes.index(padrao), format_func=_rotulo,
+                            help="Dá pra trocar no meio da conversa; a memória é mantida.")
+    if provedor != "auto" and not status[provedor][0]:
+        st.warning(f"{ROTULOS_PROVEDOR[provedor]}: {status[provedor][1]}.")
+
     usar_cache = st.toggle("Usar cache de respostas", value=config.CACHE_ATIVO,
                            help="Pergunta repetida não gasta requisição do LLM")
     st.button("🗑️ Nova conversa", on_click=nova_conversa, width="stretch")
@@ -124,13 +154,14 @@ with st.sidebar:
     st.subheader("Status")
     st.markdown(f"- Banco: {'✅' if banco_disponivel() else '❌ não encontrado'}")
     if banco_disponivel():
-        agente = carregar_agente()
+        agente = carregar_agente(provedor)
         st.markdown(f"- Busca semântica: {'✅ ativa' if agente.busca_semantica_ativa else '⚠️ índice não gerado'}")
-        st.markdown(f"- Provedor: `{agente.llm.provedor}`")
+        for p, (ok, motivo) in status.items():
+            st.markdown(f"- {p}: {'✅' if ok else '⚪'} {motivo}")
         with st.expander("Modelos (ordem de fallback)"):
-            for m in agente.llm.modelos:
+            for m in agente.llm.modelos or ["nenhum disponível"]:
                 st.markdown(f"- `{m}`")
-    if config.PROVEDOR_LLM == "openrouter" and st.button("Ver cota do OpenRouter", width="stretch"):
+    if status["openrouter"][0] and st.button("Ver cota do OpenRouter", width="stretch"):
         st.info(resumo_cota(consultar_cota()))
 
     st.subheader("Perguntas de exemplo")
@@ -150,7 +181,7 @@ if not banco_disponivel():
     st.error(f"Banco não encontrado em `{config.DB_PATH}`. Coloque o `cinerocket.db` na pasta `data/`.")
     st.stop()
 
-agente = carregar_agente()
+agente = carregar_agente(provedor)
 
 for i, msg in enumerate(st.session_state.mensagens):
     mostrar_mensagem(msg, i)

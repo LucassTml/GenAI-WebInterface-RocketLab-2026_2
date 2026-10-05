@@ -57,6 +57,8 @@ def main():
     parser.add_argument("--estimar", action="store_true", help="só mostra quantas requisições vai gastar")
     parser.add_argument("--forcar", action="store_true", help="roda mesmo se a cota parecer insuficiente")
     parser.add_argument("--pausa", type=float, default=3.0, help="segundos entre perguntas (limite 20 req/min)")
+    parser.add_argument("--provedor", choices=list(config.PROVEDORES_VALIDOS), default=None,
+                        help="sobrescreve o PROVEDOR_LLM do .env (ex.: nvidia, ollama, auto)")
     args = parser.parse_args()
 
     perguntas = carregar_perguntas()
@@ -71,7 +73,8 @@ def main():
     estimativa = estimar_requisicoes(perguntas, usar_cache)
     print(f"{len(perguntas)} pergunta(s) selecionada(s). Estimativa: ~{estimativa} requisições ao LLM.")
 
-    if config.PROVEDOR_LLM == "openrouter" and estimativa > 0:
+    provedor = args.provedor or config.PROVEDOR_LLM
+    if provedor == "openrouter" and estimativa > 0:
         cota = consultar_cota()
         restantes = (cota.get("free_model_daily_requests") or {}).get("remaining") if "erro" not in cota else None
         if restantes is not None:
@@ -81,7 +84,7 @@ def main():
     if args.estimar:
         return
 
-    agente = AgenteCineData(usar_cache=usar_cache)
+    agente = AgenteCineData(usar_cache=usar_cache, provedor=provedor)
     resultados = []
     for i, item in enumerate(perguntas, 1):
         print(f"\n[{i}/{len(perguntas)}] {item['id']} - {item['pergunta']}")
