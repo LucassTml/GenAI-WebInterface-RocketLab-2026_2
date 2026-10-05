@@ -1,70 +1,124 @@
+// Terminal > Run Task... (ou Ctrl+Shift+P > "Tasks: Run Task").
+// Não dependem de extensão nenhuma: rodam o Python do .venv direto.
 {
-  // Terminal > Run Task... (ou Ctrl+Shift+P > "Tasks: Run Task").
-  // Não dependem de extensão nenhuma: rodam o Python do .venv direto.
   "version": "2.0.0",
-  "options": {"cwd": "${workspaceFolder}"},
+  "options": {
+    "cwd": "${workspaceFolder}"
+  },
   "tasks": [
     {
       "label": "Instalar dependências (.venv)",
       "type": "shell",
-      "command": "if (-not (Test-Path .venv)) { python -m venv .venv }; .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt",
-      "options": {"shell": {"executable": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]}},
-      "problemMatcher": []
+      "command": "if (-not (Test-Path .venv)) { python -m venv .venv }; .\\.venv\\Scripts\\python.exe -m pip install -r requirements-dev.txt",
+      "problemMatcher": [],
+      "options": {
+        "shell": {
+          "executable": "powershell.exe",
+          "args": [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command"
+          ]
+        }
+      }
     },
     {
       "label": "Iniciar Ollama",
       "type": "shell",
-      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\iniciar_ollama.ps1",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\iniciar_ollama.ps1",
       "problemMatcher": []
     },
     {
       "label": "Parar Ollama",
       "type": "shell",
-      "command": "powershell -NoProfile -Command \"Get-Process ollama* -ErrorAction SilentlyContinue | Stop-Process -Force; 'Ollama parado.'\"",
-      "problemMatcher": []
+      "command": "Get-Process ollama* -ErrorAction SilentlyContinue | Stop-Process -Force; 'Ollama parado.'",
+      "problemMatcher": [],
+      "options": {
+        "shell": {
+          "executable": "powershell.exe",
+          "args": [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command"
+          ]
+        }
+      }
     },
     {
       "label": "Web: Streamlit (provedor do .env)",
       "type": "shell",
-      "command": ".\.venv\Scripts\python.exe -m streamlit run app.py",
-      "isBackground": true,
-      "problemMatcher": []
+      "command": ".\\.venv\\Scripts\\python.exe -m streamlit run app.py",
+      "problemMatcher": [],
+      "isBackground": true
     },
     {
       "label": "Web: Streamlit (auto)",
       "type": "shell",
-      "command": "$env:PROVEDOR_LLM='auto'; .\.venv\Scripts\python.exe -m streamlit run app.py",
-      "options": {"shell": {"executable": "powershell.exe", "args": ["-NoProfile", "-Command"]}},
+      "command": "$env:PROVEDOR_LLM='auto'; .\\.venv\\Scripts\\python.exe -m streamlit run app.py",
+      "problemMatcher": [],
+      "options": {
+        "shell": {
+          "executable": "powershell.exe",
+          "args": [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command"
+          ]
+        }
+      },
       "dependsOn": "Iniciar Ollama",
-      "isBackground": true,
+      "isBackground": true
+    },
+    {
+      "label": "Chat no terminal (provedor do .env)",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe main.py --mostrar-sql",
       "problemMatcher": []
     },
     {
       "label": "Chat no terminal (auto)",
       "type": "shell",
-      "command": ".\.venv\Scripts\python.exe main.py --mostrar-sql --provedor auto",
-      "dependsOn": "Iniciar Ollama",
+      "command": ".\\.venv\\Scripts\\python.exe main.py --mostrar-sql --provedor auto",
+      "problemMatcher": [],
+      "dependsOn": "Iniciar Ollama"
+    },
+    {
+      "label": "Chat no terminal (agy)",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe main.py --mostrar-sql --provedor agy",
+      "problemMatcher": []
+    },
+    {
+      "label": "Listar provedores e status",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe scripts\\testar_provedores.py --listar",
       "problemMatcher": []
     },
     {
       "label": "Testar provedores",
       "type": "shell",
-      "command": ".\.venv\Scripts\python.exe scripts\testar_provedores.py",
-      "dependsOn": "Iniciar Ollama",
-      "problemMatcher": []
+      "command": ".\\.venv\\Scripts\\python.exe scripts\\testar_provedores.py",
+      "problemMatcher": [],
+      "dependsOn": "Iniciar Ollama"
     },
     {
       "label": "Verificar cota do OpenRouter",
       "type": "shell",
-      "command": ".\.venv\Scripts\python.exe scripts\verificar_cota.py",
+      "command": ".\\.venv\\Scripts\\python.exe scripts\\verificar_cota.py",
       "problemMatcher": []
     },
     {
       "label": "Testes (pytest)",
       "type": "shell",
-      "command": ".\.venv\Scripts\python.exe -m pytest -q",
-      "group": {"kind": "test", "isDefault": true},
-      "problemMatcher": []
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest -q",
+      "problemMatcher": [],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
     }
   ]
 }

@@ -1,6 +1,6 @@
+// Aba "Run and Debug" (Ctrl+Shift+D): escolha a configuração e aperte F5.
+// O "env"/"--provedor" de cada configuração sobrescreve o PROVEDOR_LLM do .env.
 {
-  // Aba "Run and Debug" (Ctrl+Shift+D): escolha a configuração e aperte F5.
-  // O "env" de cada configuração sobrescreve o PROVEDOR_LLM do .env.
   "version": "0.2.0",
   "configurations": [
     {
@@ -8,45 +8,238 @@
       "type": "debugpy",
       "request": "launch",
       "module": "streamlit",
-      "args": ["run", "app.py", "--server.headless", "false"],
-      "cwd": "${workspaceFolder}",
-      "justMyCode": true
+      "args": [
+        "run",
+        "app.py"
+      ],
+      "cwd": "${workspaceFolder}"
     },
     {
-      "name": "Web (Streamlit) - auto (OpenRouter > NVIDIA > Ollama)",
+      "name": "Web (Streamlit) - auto (vários provedores)",
       "type": "debugpy",
       "request": "launch",
       "module": "streamlit",
-      "args": ["run", "app.py"],
+      "args": [
+        "run",
+        "app.py"
+      ],
       "cwd": "${workspaceFolder}",
-      "env": {"PROVEDOR_LLM": "auto"},
+      "env": {
+        "PROVEDOR_LLM": "auto"
+      },
       "preLaunchTask": "Iniciar Ollama"
+    },
+    {
+      "name": "Web (Streamlit) - Antigravity CLI (agy)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "app.py"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PROVEDOR_LLM": "agy"
+      }
+    },
+    {
+      "name": "Web (Streamlit) - Claude Code CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "app.py"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PROVEDOR_LLM": "claude-code"
+      }
+    },
+    {
+      "name": "Web (Streamlit) - Codex CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "app.py"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PROVEDOR_LLM": "codex"
+      }
+    },
+    {
+      "name": "Web (Streamlit) - Google Gemini",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "app.py"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PROVEDOR_LLM": "google"
+      }
     },
     {
       "name": "Web (Streamlit) - NVIDIA",
       "type": "debugpy",
       "request": "launch",
       "module": "streamlit",
-      "args": ["run", "app.py"],
+      "args": [
+        "run",
+        "app.py"
+      ],
       "cwd": "${workspaceFolder}",
-      "env": {"PROVEDOR_LLM": "nvidia"}
+      "env": {
+        "PROVEDOR_LLM": "nvidia"
+      }
     },
     {
       "name": "Web (Streamlit) - Ollama local",
       "type": "debugpy",
       "request": "launch",
       "module": "streamlit",
-      "args": ["run", "app.py"],
+      "args": [
+        "run",
+        "app.py"
+      ],
       "cwd": "${workspaceFolder}",
-      "env": {"PROVEDOR_LLM": "ollama"},
+      "env": {
+        "PROVEDOR_LLM": "ollama"
+      },
       "preLaunchTask": "Iniciar Ollama"
     },
     {
-      "name": "Terminal - chat (provedor do .env)",
+      "name": "Terminal - chat provedor do .env",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--mostrar-sql"],
+      "args": [
+        "--mostrar-sql"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat auto",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "auto"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Iniciar Ollama"
+    },
+    {
+      "name": "Terminal - chat Antigravity CLI (agy)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "agy"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat Claude Code CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "claude-code"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat Codex CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "codex"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat OpenCode CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "opencode-cli"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat Google Gemini",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "google"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat OpenCode Zen (API)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "opencode"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat Anthropic (API)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "anthropic"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat OpenAI (API)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "openai"
+      ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     },
@@ -55,7 +248,11 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--mostrar-sql", "--provedor", "nvidia"],
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "nvidia"
+      ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     },
@@ -64,26 +261,32 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
-      "args": ["--mostrar-sql", "--provedor", "ollama"],
+      "args": [
+        "--mostrar-sql",
+        "--provedor",
+        "ollama"
+      ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "preLaunchTask": "Iniciar Ollama"
     },
     {
-      "name": "Terminal - chat auto",
+      "name": "Listar provedores e status",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/main.py",
-      "args": ["--mostrar-sql", "--provedor", "auto"],
+      "program": "${workspaceFolder}/scripts/testar_provedores.py",
+      "args": [
+        "--listar"
+      ],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "preLaunchTask": "Iniciar Ollama"
+      "console": "integratedTerminal"
     },
     {
       "name": "Testar provedores (1 chamada por modelo)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/scripts/testar_provedores.py",
+      "args": [],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "preLaunchTask": "Iniciar Ollama"
@@ -93,7 +296,9 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/avaliacao/avaliar.py",
-      "args": ["--estimar"],
+      "args": [
+        "--estimar"
+      ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     },
@@ -102,7 +307,9 @@
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
-      "args": ["-q"],
+      "args": [
+        "-q"
+      ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
     }
