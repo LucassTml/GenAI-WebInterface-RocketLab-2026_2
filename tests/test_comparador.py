@@ -52,3 +52,10 @@ def test_modos_especiais():
     consulta = {"colunas": ["titulo"], "linhas": [["The Meg"]], "erro": None}
     item = {"modo": "contem_titulo", "esperado": ["shark", "meg"]}
     assert avaliar(item, RespostaAgente(texto="...", consultas=[consulta]), [])["aprovado"]
+
+
+def test_dados_certos_mas_texto_degenerado_reprova():
+    consulta = {"colunas": ["titulo", "receita"], "linhas": [r[::2] for r in GABARITO["linhas"]], "erro": None}
+    resp = RespostaAgente(texto="The user asked: top filmes. I need to... y a.y,.t a,,y", consultas=[consulta])
+    resultado = avaliar(ITEM, resp, [GABARITO])
+    assert resultado["nota"] == 1.0 and not resultado["texto_ok"] and not resultado["aprovado"]

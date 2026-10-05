@@ -122,15 +122,16 @@ def salvar_relatorio(resultados: list[dict]):
         f"# Avaliação do agente - {datetime.now():%d/%m/%Y %H:%M}\n",
         f"**Acertos: {aprovadas}/{len(resultados)} ({aprovadas / len(resultados):.0%})** · "
         f"requisições gastas: {gasto} · modelos: {', '.join(sorted({r['modelo'] or '-' for r in resultados}))}\n",
-        "| id | categoria | nota | ok? | cita top-1 | req | tempo (s) | origem |",
-        "|----|-----------|------|-----|------------|-----|-----------|--------|",
+        "| id | categoria | nota dados | texto ok? | aprovada? | cita top-1 | req | tempo (s) | origem |",
+        "|----|-----------|------------|-----------|-----------|------------|-----|-----------|--------|",
     ]
     for r in resultados:
         cita = {True: "sim", False: "não", None: "-"}[r["cita_top1"]]
         origem = "cache" if r["do_cache"] else (r["modelo"] or "-")
+        texto_ok = "sim" if r.get("texto_ok", True) else "não"
         linhas.append(
-            f"| {r['id']} | {r['categoria']} | {r['nota']:.2f} | {'✅' if r['aprovado'] else '❌'} | {cita} "
-            f"| {r['requisicoes']} | {r['tempo_segundos']} | {origem} |"
+            f"| {r['id']} | {r['categoria']} | {r['nota']:.2f} | {texto_ok} | {'✅' if r['aprovado'] else '❌'} "
+            f"| {cita} | {r['requisicoes']} | {r['tempo_segundos']} | {origem} |"
         )
     linhas.append("\n## Respostas\n")
     for r in resultados:

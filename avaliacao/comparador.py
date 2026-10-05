@@ -16,6 +16,8 @@ Pra ser justo com formas diferentes (e corretas) de escrever o SQL:
 import math
 import unicodedata
 
+from cinedata_agent.guardrails import resposta_parece_valida
+
 ESCALAS = (1, 100, 0.01, 1e-3, 1e-6, 1e-9)
 
 
@@ -134,5 +136,10 @@ def avaliar(item: dict, resposta, gabaritos: list[dict]) -> dict:
         top1 = coluna(gabaritos[0]["colunas"], gabaritos[0]["linhas"], chave)[0]
         cita_top1 = normalizar(top1) in normalizar(resposta.texto)
 
+    # Os dados certos não bastam: se o texto final veio degenerado (raciocínio
+    # vazado / lixo), o usuário não consegue usar a resposta. Isso aconteceu
+    # uma vez na avaliação real e a nota por dados não pegou.
+    texto_ok = resposta.bloqueado or resposta_parece_valida(resposta.texto)
     minimo = item.get("minimo", 0.8)
-    return {"nota": round(nota, 3), "aprovado": nota >= minimo, "cita_top1": cita_top1}
+    return {"nota": round(nota, 3), "aprovado": nota >= minimo and texto_ok, "cita_top1": cita_top1,
+            "texto_ok": texto_ok}
