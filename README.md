@@ -6,6 +6,11 @@ qualquer pessoa da empresa consiga tirar dúvidas sobre os dados sem saber SQL.
 
 > Atividade de GenAI — Rocket Lab 2026 (Visagio)
 
+> ⚠️ **Sobre os modelos:** o provedor oficial do projeto é o **OpenRouter**, e foi com ele que o agente acertou
+> **17/17** na avaliação. Também dá pra rodar com NVIDIA, Google, OpenCode, Anthropic, OpenAI, Ollama e as CLIs
+> agy / Claude Code / Codex / OpenCode, mas essas opções estão em **🧪 beta**: funcionaram nos testes rápidos e
+> ainda podem errar ou falhar. No programa elas aparecem com o selo 🧪. Detalhes em [MODELOS.md](MODELOS.md).
+
 Exemplo do tipo de resposta esperada (os números vêm do [gabarito](avaliacao/gabarito.md)):
 
 ```
@@ -23,6 +28,7 @@ CineData> O gênero com maior margem de lucro média é Horror, com 75,92%.
 - [Como funciona](#como-funciona)
 - [Passo a passo para rodar](#passo-a-passo-para-rodar)
 - [Como usar](#como-usar)
+- [Modelos e provedores (MODELOS.md)](MODELOS.md)
 - [Avaliação automática](#avaliação-automática)
 - [Testes](#testes)
 - [Decisões técnicas](#decisões-técnicas)
@@ -47,7 +53,7 @@ CineData> O gênero com maior margem de lucro média é Horror, com 75,92%.
 | Interface visual + gráficos | `app.py`, `graficos.py` | chat em Streamlit com tabela, SQL e gráfico automático |
 | Avaliação com respostas esperadas | `avaliacao/` | 17 perguntas com SQL de referência e nota automática |
 | Análise exploratória | `notebooks/exploracao_dados.ipynb` | as "pegadinhas" dos dados que viraram regras do prompt |
-| Testes automatizados | `tests/` | 94 testes, rodam sem gastar cota (LLM falso) |
+| Testes automatizados | `tests/` | 98 testes, rodam sem gastar cota (LLM falso) |
 | 11 provedores + modo auto | `provedores.py`, `llm.py`, `cli_llm.py` | APIs (OpenRouter, NVIDIA, Google, OpenCode Zen, Anthropic, OpenAI), Ollama local e CLIs (agy, Claude Code, Codex, OpenCode); tela de configuração na interface |
 
 ## Como funciona
@@ -192,21 +198,25 @@ Além do OpenRouter, o agente roda com outras **APIs** (NVIDIA, Google Gemini, O
 Ollama local) e com as **CLIs de IA instaladas no PC**, que usam o seu login e dispensam chave: Antigravity
 (`agy`), Claude Code (`claude`), Codex e OpenCode. O modo **auto** tenta vários em sequência.
 
+> 🧪 **Todos menos o OpenRouter estão em beta.** Responderam certo nos testes rápidos, mas não passaram pela
+> avaliação completa: podem errar o SQL, demorar ou falhar. No programa eles aparecem com o selo 🧪 e, ao
+> escolher um, aparece um aviso.
+
 | Grupo | `PROVEDOR_LLM` | Precisa de |
 |---|---|---|
-| APIs | `openrouter`, `nvidia`, `google`, `opencode`, `anthropic`, `openai` | a chave correspondente no `.env` |
-| Local | `ollama` | `powershell -ExecutionPolicy Bypass -File scripts\iniciar_ollama.ps1` |
-| CLIs | `agy`, `claude-code`, `codex`, `opencode-cli` | a CLI instalada e logada |
-| Vários | `auto` | ordem em `ORDEM_PROVEDORES_AUTO` |
+| APIs | `openrouter` ✅, `nvidia` 🧪, `google` 🧪, `opencode` 🧪, `anthropic` 🧪, `openai` 🧪 | a chave correspondente no `.env` |
+| Local | `ollama` 🧪 | Ollama instalado (liga sozinho quando é escolhido e desliga quando o programa fecha) |
+| CLIs | `agy` 🧪, `claude-code` 🧪, `codex` 🧪, `opencode-cli` 🧪 | a CLI instalada e logada |
+| Vários | `auto` 🧪 | ordem em `ORDEM_PROVEDORES_AUTO` |
 
 Três jeitos de configurar:
 - **interface web:** tela **⚙️ Modelos e chaves**, onde dá pra colar a chave, escolher modelos, listar os
   modelos da conta e testar com 1 chamada;
 - **`.env`:** veja o `.env.example`, que tem o link de onde gerar cada chave;
-- **linha de comando:** `python main.py --provedor agy` ou `--provedor claude-code --modelo sonnet`.
+- **linha de comando:** `.\cinedata chat --provedor agy` ou `.\cinedata chat --provedor claude-code --modelo sonnet`.
 
-Para ver o que está disponível: `python main.py --listar-provedores`. O guia completo, com chaves, comandos e
-login das CLIs, está em [`docs/como_rodar.md`](docs/como_rodar.md).
+Para ver o que está disponível: `.\cinedata provedores`. Tudo sobre modelos, chaves e como trocar está em
+**[MODELOS.md](MODELOS.md)**, e os comandos de execução em [`docs/como_rodar.md`](docs/como_rodar.md).
 
 ### VS Code / Antigravity IDE (opcional)
 A pasta `.vscode/` tem uma configuração de execução por provedor (aba **Run and Debug**, `F5`) e *tasks* em
@@ -263,7 +273,7 @@ rodar de novo não gasta nada.
 pip install -r requirements-dev.txt
 pytest
 ```
-São 94 testes cobrindo guardrails, segurança do banco (inclusive tentando burlar a validação),
+São 98 testes cobrindo guardrails, segurança do banco (inclusive tentando burlar a validação),
 timeout, fallback entre modelos, cache, memória, limite de chamadas e o comparador da avaliação.
 Os testes do agente usam um **LLM falso**, então não gastam cota.
 
@@ -296,6 +306,7 @@ O raciocínio completo está em [`docs/decisoes_tecnicas.md`](docs/decisoes_tecn
 
 ```
 cinedata-agent/
+├── cinedata.cmd / cinedata.py # atalho: roda tudo sem ativar o .venv
 ├── app.py                    # interface Streamlit (chat)
 ├── interface_config.py       # tela "Modelos e chaves" da interface
 ├── main.py                   # interface de terminal
@@ -308,6 +319,7 @@ cinedata-agent/
 │   ├── provedores.py         # catálogo dos 11 provedores (chaves, modelos, URLs)
 │   ├── llm.py                # conexão com cada provedor + fallback entre modelos e provedores
 │   ├── cli_llm.py            # usa as CLIs (agy, claude, codex, opencode) como modelo
+│   ├── ollama_local.py       # liga o Ollama só quando escolhido e desliga ao fechar
 │   ├── cache.py              # cache de respostas (SQLite)
 │   ├── busca_semantica.py    # índice de embeddings das sinopses
 │   ├── graficos.py           # gráfico automático
@@ -317,6 +329,7 @@ cinedata-agent/
 ├── scripts/                  # indexar sinopses, cota, listar/testar modelos, iniciar Ollama
 ├── .vscode/                  # configurações de execução (Antigravity / VS Code)
 ├── tests/                    # pytest (sem gastar cota)
+├── MODELOS.md                # modelos/provedores: quais existem, chaves e como trocar
 ├── docs/decisoes_tecnicas.md
 └── data/                     # cinerocket.db e arquivos gerados (fora do git)
 ```

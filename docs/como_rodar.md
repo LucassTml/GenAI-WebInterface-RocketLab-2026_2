@@ -1,5 +1,8 @@
 # Como rodar: provedores de LLM, chaves e modelos
 
+> 🧪 Só o OpenRouter foi avaliado (17/17); os outros provedores estão em beta e podem falhar.
+> O resumo sobre modelos está em [`MODELOS.md`](../MODELOS.md).
+
 O agente roda com **11 provedores**, em dois grupos, mais o modo **auto**:
 
 - **APIs**, que precisam de chave no `.env`: OpenRouter, NVIDIA, Google Gemini, OpenCode Zen, Anthropic e OpenAI.
@@ -131,11 +134,12 @@ agy -p="Rode .venv\Scripts\python.exe main.py --listar-provedores e me diga quai
 ```
 
 ## Ollama (modelo local)
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\iniciar_ollama.ps1
-```
-O script acha o Ollama instalado **ou** a versão portátil em `..\ollama-portable`, sobe o servidor com contexto de
-8k tokens e baixa o modelo do `.env` se ainda não tiver. Para parar: `Get-Process ollama* | Stop-Process`.
+O Ollama **só liga quando você escolhe o provedor `ollama`** (no seletor da interface, no `.env` ou com
+`--provedor ollama`). Ele **desliga sozinho quando o programa fecha**, mesmo fechando o terminal direto. Se ele já
+estava rodando antes por outro motivo, o programa usa e não fecha. O modo auto nunca liga o Ollama, só usa se ele
+já estiver ligado. Mais detalhes em [`MODELOS.md`](../MODELOS.md).
+
+Pra ligar na mão (fica ligado até você parar): `.\cinedata ollama`. Pra parar: `Get-Process ollama* | Stop-Process`.
 
 ## Comandos úteis
 ```powershell
