@@ -1,6 +1,6 @@
 import pytest
 
-from cinedata_agent.guardrails import SQLBloqueado, validar_sql, verificar_pergunta
+from cinedata_agent.guardrails import SQLBloqueado, resposta_parece_valida, validar_sql, verificar_pergunta
 
 
 # ------------------------------------------------------------- SQL --------
@@ -105,3 +105,23 @@ def test_pedido_de_escrita_e_barrado(pergunta):
 def test_pergunta_vazia_ou_gigante():
     assert verificar_pergunta("   ")[0] is False
     assert verificar_pergunta("a" * 5000)[0] is False
+
+
+# -------------------------------------------------------- saída -----------
+
+def test_resposta_normal_e_valida():
+    texto = (
+        "O gênero com maior margem de lucro média é **Horror**, com 75,92%.\n\n"
+        "| Gênero | Lucro médio (R$) |\n|---|---|\n| Science Fiction | R$ 520,8 mi |\n| Adventure | R$ 514,7 mi |\n\n"
+        "Critério: só filmes com receita e orçamento informados, em US$ (`receita_usd`)."
+    )
+    assert resposta_parece_valida(texto)
+
+
+def test_raciocinio_vazado_e_invalido():
+    assert not resposta_parece_valida('The user asked: "Qual o lucro médio por gênero?" I need to provide...')
+
+
+def test_texto_degenerado_e_invalido():
+    lixo = "Agora vou formatar os números: " + "y a.y,.t a,,y,y? that, very,, a, a, something, ay,y a,y, " * 5
+    assert not resposta_parece_valida(lixo)

@@ -26,6 +26,7 @@ from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
 
 from . import config
+from .guardrails import resposta_parece_valida
 
 PAUSA_MODELO_LOTADO_SEG = 180
 MAX_TENTATIVAS_POR_CHAMADA = 3  # nunca gasta mais que isso numa chamada só
@@ -175,6 +176,10 @@ class LLMComFallback:
 
             if _resposta_vazia(resposta):
                 erros.append(f"{modelo}: resposta vazia")
+                continue
+            if not resposta.tool_calls and not resposta_parece_valida(resposta.text):
+                # guardrail de saída: raciocínio vazado / texto degenerado
+                erros.append(f"{modelo}: resposta degenerada")
                 continue
             return resposta, modelo
 

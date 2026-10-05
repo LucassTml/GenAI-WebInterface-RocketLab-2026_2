@@ -10,6 +10,10 @@ São duas camadas:
 2) validar_sql(): roda antes de executar o SQL gerado pelo modelo. Só deixa
    passar UMA instrução de leitura (SELECT / WITH ... SELECT).
 
+3) resposta_parece_valida(): roda na resposta final do LLM. Pega quando o
+   modelo gratuito "vaza" o raciocínio ou degenera em texto sem sentido; aí
+   o fallback tenta outro modelo (ver llm.py).
+
 Mesmo que alguém dê um jeito de passar pelas regex daqui, o banco ainda é
 aberto em modo somente leitura e com um authorizer do sqlite que nega
 qualquer coisa que não seja leitura (ver banco.py). A ideia é ter várias
@@ -171,3 +175,33 @@ def validar_sql(sql: str) -> str:
         raise SQLBloqueado("Consultas às tabelas internas do SQLite não são permitidas.")
 
     return limpo
+
+
+# --------------------------------------------------------------------------
+# 3) Guardrail de saída
+# --------------------------------------------------------------------------
+# Esse surgiu na avaliação com o OpenRouter: numa das respostas o modelo
+# gratuito "vazou" o raciocínio interno em inglês ("The user asked: ...") e
+# no final começou a gerar lixo (",y a.y,.Tur..."). Os DADOS estavam certos,
+# mas o texto era inutilizável. Medi dois sinais nas 17 respostas reais:
+#   - resposta começando com raciocínio em inglês: só a quebrada tinha;
+#   - letras soltas sem sentido (y, t, g...): 49 na quebrada, no máximo 2
+#     nas boas (ex.: o "m" de "5 m").
+_RE_RACIOCINIO_VAZADO = re.compile(
+    r"^\s*(the user|we need to|i need to|let me|let's|okay|ok,|so,? the|first,|we have)", re.IGNORECASE
+)
+# consoante sozinha (não pega "a", "e", "o", "é", nem o R de R$)
+_RE_LETRA_SOLTA = re.compile(r"(?<![A-Za-zÀ-ÿ])[b-df-hj-np-tv-zB-DF-HJ-NP-TV-Z](?![A-Za-zÀ-ÿ$])")
+
+
+def resposta_parece_valida(texto: str) -> bool:
+    """False se o texto final do LLM parece raciocínio vazado ou lixo."""
+    texto = (texto or "").strip()
+    if not texto:
+        return False
+    if _RE_RACIOCINIO_VAZADO.match(texto):
+        return False
+    sem_codigo = re.sub(r"`[^`]*`", "", texto)  # nomes de coluna em `crase` não contam
+    soltas = len(_RE_LETRA_SOLTA.findall(sem_codigo))
+    palavras = len(re.findall(r"[A-Za-zÀ-ÿ]+", sem_codigo)) or 1
+    return not (soltas >= 10 and soltas / palavras > 0.04)

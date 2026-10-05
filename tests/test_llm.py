@@ -84,3 +84,11 @@ def test_limite_de_tentativas_por_chamada(chats):
     with pytest.raises(llm.NenhumModeloDisponivel):
         cliente.invocar([])
     assert cliente.requisicoes_feitas == llm.MAX_TENTATIVAS_POR_CHAMADA
+
+
+def test_resposta_degenerada_tenta_outro(chats):
+    chats["a:free"] = ChatQueFalha(resposta=AIMessage("The user asked: qual o lucro? I need to compute ,y a.y,.t"))
+    chats["b:free"] = ChatQueFalha(resposta=AIMessage("O lucro médio de Science Fiction é R$ 520,8 mi."))
+    cliente = llm.LLMComFallback(modelos=["a:free", "b:free"], provedor="openrouter")
+    resposta, modelo = cliente.invocar([])
+    assert modelo == "b:free" and cliente.requisicoes_feitas == 2
