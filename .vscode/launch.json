@@ -26,8 +26,7 @@
       "cwd": "${workspaceFolder}",
       "env": {
         "PROVEDOR_LLM": "auto"
-      },
-      "preLaunchTask": "Iniciar Ollama"
+      }
     },
     {
       "name": "Web (Streamlit) - Antigravity CLI (agy)",
@@ -111,8 +110,7 @@
       "cwd": "${workspaceFolder}",
       "env": {
         "PROVEDOR_LLM": "ollama"
-      },
-      "preLaunchTask": "Iniciar Ollama"
+      }
     },
     {
       "name": "Terminal - chat provedor do .env",
@@ -136,8 +134,7 @@
         "auto"
       ],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "preLaunchTask": "Iniciar Ollama"
+      "console": "integratedTerminal"
     },
     {
       "name": "Terminal - chat Antigravity CLI (agy)",
@@ -267,8 +264,7 @@
         "ollama"
       ],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "preLaunchTask": "Iniciar Ollama"
+      "console": "integratedTerminal"
     },
     {
       "name": "Listar provedores e status",
@@ -288,8 +284,7 @@
       "program": "${workspaceFolder}/scripts/testar_provedores.py",
       "args": [],
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "preLaunchTask": "Iniciar Ollama"
+      "console": "integratedTerminal"
     },
     {
       "name": "Avaliação - estimar custo",

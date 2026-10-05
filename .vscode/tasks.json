@@ -69,7 +69,6 @@
           ]
         }
       },
-      "dependsOn": "Iniciar Ollama",
       "isBackground": true
     },
     {
@@ -82,8 +81,7 @@
       "label": "Chat no terminal (auto)",
       "type": "shell",
       "command": ".\\.venv\\Scripts\\python.exe main.py --mostrar-sql --provedor auto",
-      "problemMatcher": [],
-      "dependsOn": "Iniciar Ollama"
+      "problemMatcher": []
     },
     {
       "label": "Chat no terminal (agy)",
@@ -101,8 +99,7 @@
       "label": "Testar provedores",
       "type": "shell",
       "command": ".\\.venv\\Scripts\\python.exe scripts\\testar_provedores.py",
-      "problemMatcher": [],
-      "dependsOn": "Iniciar Ollama"
+      "problemMatcher": []
     },
     {
       "label": "Verificar cota do OpenRouter",
