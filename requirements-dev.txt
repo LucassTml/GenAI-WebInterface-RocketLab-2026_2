@@ -1,0 +1,5 @@
+# só pra rodar os testes e o notebook de exploração
+-r requirements.txt
+pytest>=8.0
+jupyter>=1.0
+matplotlib>=3.9
