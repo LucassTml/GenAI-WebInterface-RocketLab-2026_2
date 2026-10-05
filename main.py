@@ -6,7 +6,10 @@ Interface de linha de comando do agente CineData.
     python main.py --mostrar-sql                    # mostra o SQL e a tabela de cada consulta
     python main.py --provedor ollama                # modelo local (Ollama)
     python main.py --provedor nvidia                # API da NVIDIA (precisa de NVIDIA_API_KEY)
-    python main.py --provedor auto                  # OpenRouter -> NVIDIA -> Ollama
+    python main.py --provedor auto                  # tenta os provedores de ORDEM_PROVEDORES_AUTO
+    python main.py --provedor agy                   # usa o Antigravity CLI (sem chave)
+    python main.py --provedor claude-code --modelo sonnet
+    python main.py --listar-provedores              # mostra todos os provedores e o status
 
 Comandos dentro do chat: /nova  /sql  /cota  /exemplos  /ajuda  /sair
 """
@@ -16,7 +19,7 @@ import sys
 
 from tabulate import tabulate
 
-from cinedata_agent import config
+from cinedata_agent import config, provedores
 from cinedata_agent.agente import AgenteCineData
 from cinedata_agent.banco import banco_disponivel
 from cinedata_agent.llm import consultar_cota, resumo_cota
@@ -82,10 +85,18 @@ def main():
     parser.add_argument("pergunta", nargs="*", help="pergunta única (sem isso abre o modo conversa)")
     parser.add_argument("--mostrar-sql", action="store_true", help="mostra SQL e resultado das consultas")
     parser.add_argument("--sem-cache", action="store_true", help="não usa o cache de respostas")
-    parser.add_argument("--provedor", choices=list(config.PROVEDORES_VALIDOS), default=None,
+    parser.add_argument("--provedor", choices=list(provedores.VALIDOS), default=None,
                         help="sobrescreve o PROVEDOR_LLM do .env")
     parser.add_argument("--modelo", default=None, help="força um modelo específico")
+    parser.add_argument("--listar-provedores", action="store_true", help="lista os provedores e sai")
     args = parser.parse_args()
+
+    if args.listar_provedores:
+        from cinedata_agent.llm import status_provedores
+
+        for pid, (ok, motivo) in status_provedores().items():
+            print(f"{'OK ' if ok else '-- '} {pid:<14} {provedores.obter(pid).nome:<32} {motivo}")
+        return
 
     if not banco_disponivel():
         sys.exit(f"Banco não encontrado em {config.DB_PATH}. Veja o README (passo 3).")

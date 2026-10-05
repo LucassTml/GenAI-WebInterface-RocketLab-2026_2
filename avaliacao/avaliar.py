@@ -30,7 +30,7 @@ sys.path.insert(0, str(RAIZ))
 
 from avaliacao.comparador import avaliar  # noqa: E402
 from avaliacao.gerar_gabarito import carregar_perguntas, rodar_gabarito  # noqa: E402
-from cinedata_agent import config  # noqa: E402
+from cinedata_agent import config, provedores  # noqa: E402
 from cinedata_agent.agente import AgenteCineData  # noqa: E402
 from cinedata_agent.cache import CacheRespostas  # noqa: E402
 from cinedata_agent.llm import consultar_cota  # noqa: E402
@@ -57,7 +57,7 @@ def main():
     parser.add_argument("--estimar", action="store_true", help="só mostra quantas requisições vai gastar")
     parser.add_argument("--forcar", action="store_true", help="roda mesmo se a cota parecer insuficiente")
     parser.add_argument("--pausa", type=float, default=3.0, help="segundos entre perguntas (limite 20 req/min)")
-    parser.add_argument("--provedor", choices=list(config.PROVEDORES_VALIDOS), default=None,
+    parser.add_argument("--provedor", choices=list(provedores.VALIDOS), default=None,
                         help="sobrescreve o PROVEDOR_LLM do .env (ex.: nvidia, ollama, auto)")
     args = parser.parse_args()
 
