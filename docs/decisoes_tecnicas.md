@@ -76,6 +76,12 @@ START → guardrail_entrada ─(bloqueou)→ END
 - **Ollama (opcional)**: o mesmo código roda com um modelo local apontando a `base_url` para
   `localhost:11434/v1`. Usei para testar o fluxo inteiro sem gastar cota. Modelos pequenos
   (3-4B) erram muito o SQL, mas servem para testar o encadeamento.
+- **NVIDIA e modo auto**: depois incluí a API da NVIDIA (build.nvidia.com), que também é compatível com a
+  da OpenAI. Cada modelo virou um "alvo" `provedor:modelo`, e no modo `auto` a fila é OpenRouter → NVIDIA →
+  Ollama, só com os provedores disponíveis. A diferença em relação ao fallback entre modelos é o tratamento
+  por provedor: cota diária esgotada ou chave recusada tira o *provedor inteiro* da fila (não adianta tentar
+  outro modelo dele), enquanto 429 de "lotado" só põe aquele modelo de castigo. Detalhes de uso em
+  [`como_rodar.md`](como_rodar.md).
 
 ---
 

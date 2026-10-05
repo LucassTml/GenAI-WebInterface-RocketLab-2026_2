@@ -47,8 +47,8 @@ CineData> O gênero com maior margem de lucro média é Horror, com 75,92%.
 | Interface visual + gráficos | `app.py`, `graficos.py` | chat em Streamlit com tabela, SQL e gráfico automático |
 | Avaliação com respostas esperadas | `avaliacao/` | 17 perguntas com SQL de referência e nota automática |
 | Análise exploratória | `notebooks/exploracao_dados.ipynb` | as "pegadinhas" dos dados que viraram regras do prompt |
-| Testes automatizados | `tests/` | 75 testes, rodam sem gastar cota (LLM falso) |
-| Modelo local (opcional) | `llm.py` | mesmo código roda com Ollama quando a cota acaba |
+| Testes automatizados | `tests/` | 80 testes, rodam sem gastar cota (LLM falso) |
+| Vários provedores + modo auto | `llm.py` | OpenRouter, NVIDIA e Ollama local; no modo auto, se um cai ou a cota acaba, passa pro próximo |
 
 ## Como funciona
 
@@ -176,19 +176,24 @@ dão erro também contam. O projeto já economiza o máximo possível, mas vale 
 - a lista de modelos pode ser trocada no `.env` (`MODELOS_LLM`). Para ver os modelos gratuitos com
   tool calling disponíveis hoje: `python scripts/listar_modelos_free.py`.
 
-### (Opcional) Rodar com modelo local (Ollama)
-Útil quando a cota do dia acabou. Instale o [Ollama](https://ollama.com/download), baixe um modelo
-com suporte a tools e mude o `.env`:
-```bash
-ollama pull qwen2.5:3b
-```
-```
-PROVEDOR_LLM=ollama
-OLLAMA_MODELO=qwen2.5:3b
-```
-O `qwen2.5:3b` coube inteiro numa GPU de 4 GB (MX570) e respondeu em 15-30 s por pergunta. Com GPU
-melhor dá pra usar `qwen3:8b`. Modelos pequenos erram bem mais o SQL que os do OpenRouter (num teste
-com 5 perguntas o de 3B acertou 4), então servem mais para testar o fluxo.
+### Outros provedores: NVIDIA, Ollama local e modo auto
+Além do OpenRouter, o agente roda com a **API da NVIDIA** (build.nvidia.com) e com **modelo local via Ollama**,
+e tem um modo **auto** que tenta OpenRouter → NVIDIA → Ollama (se a cota de um acabar, passa pro próximo).
+
+| `PROVEDOR_LLM` | Precisa de |
+|---|---|
+| `openrouter` (padrão) | `OPENROUTER_API_KEY` |
+| `nvidia` | `NVIDIA_API_KEY` (`nvapi-...`, gerada em https://build.nvidia.com) |
+| `ollama` | Ollama rodando: `powershell -ExecutionPolicy Bypass -File scripts\iniciar_ollama.ps1` |
+| `auto` | pelo menos um dos três |
+
+Dá pra escolher no `.env`, na linha de comando (`python main.py --provedor auto`) ou no seletor da barra lateral
+da interface web. Pra ver quais modelos de cada provedor sabem usar tools: `python scripts/testar_provedores.py`.
+
+### Rodar pelo Antigravity / VS Code
+A pasta `.vscode/` já tem configurações prontas: na aba **Run and Debug** (`Ctrl+Shift+D`) é só escolher
+"Web (Streamlit) - auto", "Terminal - chat Ollama local" etc. e apertar **F5**; também há *tasks* em
+**Terminal → Run Task**. Passo a passo completo em [`docs/como_rodar.md`](docs/como_rodar.md).
 
 ## Avaliação automática
 
@@ -241,7 +246,7 @@ rodar de novo não gasta nada.
 pip install -r requirements-dev.txt
 pytest
 ```
-São 75 testes cobrindo guardrails, segurança do banco (inclusive tentando burlar a validação),
+São 80 testes cobrindo guardrails, segurança do banco (inclusive tentando burlar a validação),
 timeout, fallback entre modelos, cache, memória, limite de chamadas e o comparador da avaliação.
 Os testes do agente usam um **LLM falso**, então não gastam cota.
 
@@ -282,14 +287,15 @@ cinedata-agent/
 │   ├── ferramentas.py        # tools: executar_sql e buscar_filmes_por_sinopse
 │   ├── banco.py              # conexão read-only, authorizer, timeout, dicas de erro
 │   ├── guardrails.py         # validação da pergunta e do SQL
-│   ├── llm.py                # OpenRouter/Ollama + fallback entre modelos + cota
+│   ├── llm.py                # OpenRouter/NVIDIA/Ollama + fallback entre modelos e provedores
 │   ├── cache.py              # cache de respostas (SQLite)
 │   ├── busca_semantica.py    # índice de embeddings das sinopses
 │   ├── graficos.py           # gráfico automático
 │   └── config.py             # leitura do .env
 ├── avaliacao/                # perguntas + gabarito + avaliação automática
 ├── notebooks/                # análise exploratória dos dados
-├── scripts/                  # indexar sinopses, verificar cota, listar modelos
+├── scripts/                  # indexar sinopses, cota, listar/testar modelos, iniciar Ollama
+├── .vscode/                  # configurações de execução (Antigravity / VS Code)
 ├── tests/                    # pytest (sem gastar cota)
 ├── docs/decisoes_tecnicas.md
 └── data/                     # cinerocket.db e arquivos gerados (fora do git)
