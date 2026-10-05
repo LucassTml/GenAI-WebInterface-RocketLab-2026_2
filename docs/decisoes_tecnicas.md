@@ -78,7 +78,14 @@ START → guardrail_entrada ─(bloqueou)→ END
   (3-4B) erram muito o SQL, mas servem para testar o encadeamento.
 - **NVIDIA e modo auto**: depois incluí a API da NVIDIA (build.nvidia.com), que também é compatível com a
   da OpenAI. Cada modelo virou um "alvo" `provedor:modelo`, e no modo `auto` a fila é OpenRouter → NVIDIA →
-  Ollama, só com os provedores disponíveis. A diferença em relação ao fallback entre modelos é o tratamento
+  Ollama, só com os provedores disponíveis.
+- **CLIs como provedor (agy, Claude Code, Codex, OpenCode)**: elas usam o login/assinatura que a pessoa já tem, mas
+  pela linha de comando não existe *tool calling* nativo. Fiz um adaptador (`cli_llm.py`) que monta um prompt
+  único com o protocolo `<tool_call>{json}</tool_call>`, roda a CLI numa pasta temporária vazia (com as ferramentas
+  dela desligadas ou em modo leitura) e converte a saída numa tool call de verdade. O grafo não precisou mudar
+  nada. Testei as quatro de ponta a ponta e todas acertaram a pergunta de teste.
+- **Anthropic** entra pelo SDK oficial (`langchain-anthropic`), e não pelo endpoint compatível com OpenAI. Os
+  modelos Claude atuais recusam `temperature`, então esse provedor não manda o parâmetro. A diferença em relação ao fallback entre modelos é o tratamento
   por provedor: cota diária esgotada ou chave recusada tira o *provedor inteiro* da fila (não adianta tentar
   outro modelo dele), enquanto 429 de "lotado" só põe aquele modelo de castigo. Detalhes de uso em
   [`como_rodar.md`](como_rodar.md).

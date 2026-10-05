@@ -47,8 +47,8 @@ CineData> O gênero com maior margem de lucro média é Horror, com 75,92%.
 | Interface visual + gráficos | `app.py`, `graficos.py` | chat em Streamlit com tabela, SQL e gráfico automático |
 | Avaliação com respostas esperadas | `avaliacao/` | 17 perguntas com SQL de referência e nota automática |
 | Análise exploratória | `notebooks/exploracao_dados.ipynb` | as "pegadinhas" dos dados que viraram regras do prompt |
-| Testes automatizados | `tests/` | 80 testes, rodam sem gastar cota (LLM falso) |
-| Vários provedores + modo auto | `llm.py` | OpenRouter, NVIDIA e Ollama local; no modo auto, se um cai ou a cota acaba, passa pro próximo |
+| Testes automatizados | `tests/` | 94 testes, rodam sem gastar cota (LLM falso) |
+| 11 provedores + modo auto | `provedores.py`, `llm.py`, `cli_llm.py` | APIs (OpenRouter, NVIDIA, Google, OpenCode Zen, Anthropic, OpenAI), Ollama local e CLIs (agy, Claude Code, Codex, OpenCode); tela de configuração na interface |
 
 ## Como funciona
 
@@ -176,24 +176,30 @@ dão erro também contam. O projeto já economiza o máximo possível, mas vale 
 - a lista de modelos pode ser trocada no `.env` (`MODELOS_LLM`). Para ver os modelos gratuitos com
   tool calling disponíveis hoje: `python scripts/listar_modelos_free.py`.
 
-### Outros provedores: NVIDIA, Ollama local e modo auto
-Além do OpenRouter, o agente roda com a **API da NVIDIA** (build.nvidia.com) e com **modelo local via Ollama**,
-e tem um modo **auto** que tenta OpenRouter → NVIDIA → Ollama (se a cota de um acabar, passa pro próximo).
+### Escolher o modelo: 11 provedores + modo auto
+Além do OpenRouter, o agente roda com outras **APIs** (NVIDIA, Google Gemini, OpenCode Zen, Anthropic, OpenAI e
+Ollama local) e com as **CLIs de IA instaladas no PC**, que usam o seu login e dispensam chave: Antigravity
+(`agy`), Claude Code (`claude`), Codex e OpenCode. O modo **auto** tenta vários em sequência.
 
-| `PROVEDOR_LLM` | Precisa de |
-|---|---|
-| `openrouter` (padrão) | `OPENROUTER_API_KEY` |
-| `nvidia` | `NVIDIA_API_KEY` (`nvapi-...`, gerada em https://build.nvidia.com) |
-| `ollama` | Ollama rodando: `powershell -ExecutionPolicy Bypass -File scripts\iniciar_ollama.ps1` |
-| `auto` | pelo menos um dos três |
+| Grupo | `PROVEDOR_LLM` | Precisa de |
+|---|---|---|
+| APIs | `openrouter`, `nvidia`, `google`, `opencode`, `anthropic`, `openai` | a chave correspondente no `.env` |
+| Local | `ollama` | `powershell -ExecutionPolicy Bypass -File scripts\iniciar_ollama.ps1` |
+| CLIs | `agy`, `claude-code`, `codex`, `opencode-cli` | a CLI instalada e logada |
+| Vários | `auto` | ordem em `ORDEM_PROVEDORES_AUTO` |
 
-Dá pra escolher no `.env`, na linha de comando (`python main.py --provedor auto`) ou no seletor da barra lateral
-da interface web. Pra ver quais modelos de cada provedor sabem usar tools: `python scripts/testar_provedores.py`.
+Três jeitos de configurar:
+- **interface web:** tela **⚙️ Modelos e chaves**, onde dá pra colar a chave, escolher modelos, listar os
+  modelos da conta e testar com 1 chamada;
+- **`.env`:** veja o `.env.example`, que tem o link de onde gerar cada chave;
+- **linha de comando:** `python main.py --provedor agy` ou `--provedor claude-code --modelo sonnet`.
 
-### Rodar pelo Antigravity / VS Code
-A pasta `.vscode/` já tem configurações prontas: na aba **Run and Debug** (`Ctrl+Shift+D`) é só escolher
-"Web (Streamlit) - auto", "Terminal - chat Ollama local" etc. e apertar **F5**; também há *tasks* em
-**Terminal → Run Task**. Passo a passo completo em [`docs/como_rodar.md`](docs/como_rodar.md).
+Para ver o que está disponível: `python main.py --listar-provedores`. O guia completo, com chaves, comandos e
+login das CLIs, está em [`docs/como_rodar.md`](docs/como_rodar.md).
+
+### VS Code / Antigravity IDE (opcional)
+A pasta `.vscode/` tem uma configuração de execução por provedor (aba **Run and Debug**, `F5`) e *tasks* em
+**Terminal → Run Task**.
 
 ## Avaliação automática
 
@@ -246,7 +252,7 @@ rodar de novo não gasta nada.
 pip install -r requirements-dev.txt
 pytest
 ```
-São 80 testes cobrindo guardrails, segurança do banco (inclusive tentando burlar a validação),
+São 94 testes cobrindo guardrails, segurança do banco (inclusive tentando burlar a validação),
 timeout, fallback entre modelos, cache, memória, limite de chamadas e o comparador da avaliação.
 Os testes do agente usam um **LLM falso**, então não gastam cota.
 
@@ -279,7 +285,8 @@ O raciocínio completo está em [`docs/decisoes_tecnicas.md`](docs/decisoes_tecn
 
 ```
 cinedata-agent/
-├── app.py                    # interface Streamlit
+├── app.py                    # interface Streamlit (chat)
+├── interface_config.py       # tela "Modelos e chaves" da interface
 ├── main.py                   # interface de terminal
 ├── cinedata_agent/
 │   ├── agente.py             # grafo LangGraph (guardrail → agente ⇄ ferramentas)
@@ -287,7 +294,9 @@ cinedata-agent/
 │   ├── ferramentas.py        # tools: executar_sql e buscar_filmes_por_sinopse
 │   ├── banco.py              # conexão read-only, authorizer, timeout, dicas de erro
 │   ├── guardrails.py         # validação da pergunta e do SQL
-│   ├── llm.py                # OpenRouter/NVIDIA/Ollama + fallback entre modelos e provedores
+│   ├── provedores.py         # catálogo dos 11 provedores (chaves, modelos, URLs)
+│   ├── llm.py                # conexão com cada provedor + fallback entre modelos e provedores
+│   ├── cli_llm.py            # usa as CLIs (agy, claude, codex, opencode) como modelo
 │   ├── cache.py              # cache de respostas (SQLite)
 │   ├── busca_semantica.py    # índice de embeddings das sinopses
 │   ├── graficos.py           # gráfico automático
