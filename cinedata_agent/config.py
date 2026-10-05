@@ -53,52 +53,14 @@ MAX_LINHAS_PARA_LLM = _env_int("MAX_LINHAS_PARA_LLM", 30)
 MAX_LINHAS_RESULTADO = _env_int("MAX_LINHAS_RESULTADO", 500)
 
 # ------------------------------------------------------------------ LLM ---
-# Provedores suportados (todos falam a API no formato da OpenAI):
-#   openrouter -> modelos :free (padrão da atividade, 50 req/dia)
-#   nvidia     -> API da NVIDIA (build.nvidia.com), precisa de NVIDIA_API_KEY
-#   ollama     -> modelo rodando localmente, sem internet e sem cota
-#   auto       -> tenta na ordem de ORDEM_PROVEDORES_AUTO; se a cota de um
-#                 acabar ou ele cair, passa pro próximo
-PROVEDORES_VALIDOS = ("openrouter", "nvidia", "ollama", "auto")
+# Provedor padrão. A lista completa (OpenRouter, NVIDIA, Google, OpenCode Zen,
+# Anthropic, OpenAI, Ollama e as CLIs agy/claude/codex/opencode), com as
+# variáveis de chave e de modelos de cada um, fica em provedores.py.
+# "auto" tenta os provedores de ORDEM_PROVEDORES_AUTO em sequência.
 PROVEDOR_LLM = os.getenv("PROVEDOR_LLM", "openrouter").strip().lower()
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-
-# Ordem de preferência dos modelos gratuitos. Se o primeiro der erro 429 de
-# provider lotado, o agente tenta o próximo (fallback).
-# Escolhi modelos :free que suportam tool calling (conferido em
-# https://openrouter.ai/api/v1/models, campo supported_parameters).
-MODELOS_PADRAO = (
-    "nvidia/nemotron-3.5-lightning:free,"
-    "qwen/qwen3.8-27b:free,"
-    "google/gemma-4-31b-it:free,"
-    "openrouter/free"
-)
-MODELOS_LLM = [m.strip() for m in os.getenv("MODELOS_LLM", MODELOS_PADRAO).split(",") if m.strip()]
-
-# NVIDIA (https://build.nvidia.com -> "Get API Key", começa com nvapi-).
-# Escolhi modelos da lista de https://integrate.api.nvidia.com/v1/models; o
-# primeiro é da mesma família que acertou 17/17 na avaliação pelo OpenRouter.
-# Pra conferir quais respondem com tool calling: python scripts/testar_provedores.py
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "").strip()
-NVIDIA_BASE_URL = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
-MODELOS_NVIDIA_PADRAO = (
-    "nvidia/nemotron-3.5-lightning-30b-a3b,"
-    "nvidia/nemotron-3-super-120b-a12b,"
-    "openai/gpt-oss-20b"
-)
-MODELOS_NVIDIA = [m.strip() for m in os.getenv("MODELOS_NVIDIA", MODELOS_NVIDIA_PADRAO).split(",") if m.strip()]
-
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-# aceita mais de um modelo separado por vírgula (ex.: qwen2.5:3b,qwen3:4b)
-OLLAMA_MODELO = os.getenv("OLLAMA_MODELO", "qwen2.5:3b")
-MODELOS_OLLAMA = [m.strip() for m in OLLAMA_MODELO.split(",") if m.strip()]
-
-# ordem usada quando PROVEDOR_LLM=auto
-ORDEM_PROVEDORES_AUTO = [
-    p.strip() for p in os.getenv("ORDEM_PROVEDORES_AUTO", "openrouter,nvidia,ollama").split(",") if p.strip()
-]
 
 TEMPERATURA = float(os.getenv("TEMPERATURA", "0"))
 TIMEOUT_LLM_SEGUNDOS = _env_int("TIMEOUT_LLM_SEGUNDOS", 90)
