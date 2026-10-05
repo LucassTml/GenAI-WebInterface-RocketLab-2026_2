@@ -1,0 +1,70 @@
+{
+  // Terminal > Run Task... (ou Ctrl+Shift+P > "Tasks: Run Task").
+  // Não dependem de extensão nenhuma: rodam o Python do .venv direto.
+  "version": "2.0.0",
+  "options": {"cwd": "${workspaceFolder}"},
+  "tasks": [
+    {
+      "label": "Instalar dependências (.venv)",
+      "type": "shell",
+      "command": "if (-not (Test-Path .venv)) { python -m venv .venv }; .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt",
+      "options": {"shell": {"executable": "powershell.exe", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]}},
+      "problemMatcher": []
+    },
+    {
+      "label": "Iniciar Ollama",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\iniciar_ollama.ps1",
+      "problemMatcher": []
+    },
+    {
+      "label": "Parar Ollama",
+      "type": "shell",
+      "command": "powershell -NoProfile -Command \"Get-Process ollama* -ErrorAction SilentlyContinue | Stop-Process -Force; 'Ollama parado.'\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Web: Streamlit (provedor do .env)",
+      "type": "shell",
+      "command": ".\.venv\Scripts\python.exe -m streamlit run app.py",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Web: Streamlit (auto)",
+      "type": "shell",
+      "command": "$env:PROVEDOR_LLM='auto'; .\.venv\Scripts\python.exe -m streamlit run app.py",
+      "options": {"shell": {"executable": "powershell.exe", "args": ["-NoProfile", "-Command"]}},
+      "dependsOn": "Iniciar Ollama",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Chat no terminal (auto)",
+      "type": "shell",
+      "command": ".\.venv\Scripts\python.exe main.py --mostrar-sql --provedor auto",
+      "dependsOn": "Iniciar Ollama",
+      "problemMatcher": []
+    },
+    {
+      "label": "Testar provedores",
+      "type": "shell",
+      "command": ".\.venv\Scripts\python.exe scripts\testar_provedores.py",
+      "dependsOn": "Iniciar Ollama",
+      "problemMatcher": []
+    },
+    {
+      "label": "Verificar cota do OpenRouter",
+      "type": "shell",
+      "command": ".\.venv\Scripts\python.exe scripts\verificar_cota.py",
+      "problemMatcher": []
+    },
+    {
+      "label": "Testes (pytest)",
+      "type": "shell",
+      "command": ".\.venv\Scripts\python.exe -m pytest -q",
+      "group": {"kind": "test", "isDefault": true},
+      "problemMatcher": []
+    }
+  ]
+}

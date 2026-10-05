@@ -1,0 +1,110 @@
+{
+  // Aba "Run and Debug" (Ctrl+Shift+D): escolha a configuração e aperte F5.
+  // O "env" de cada configuração sobrescreve o PROVEDOR_LLM do .env.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Web (Streamlit) - provedor do .env",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": ["run", "app.py", "--server.headless", "false"],
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true
+    },
+    {
+      "name": "Web (Streamlit) - auto (OpenRouter > NVIDIA > Ollama)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": ["run", "app.py"],
+      "cwd": "${workspaceFolder}",
+      "env": {"PROVEDOR_LLM": "auto"},
+      "preLaunchTask": "Iniciar Ollama"
+    },
+    {
+      "name": "Web (Streamlit) - NVIDIA",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": ["run", "app.py"],
+      "cwd": "${workspaceFolder}",
+      "env": {"PROVEDOR_LLM": "nvidia"}
+    },
+    {
+      "name": "Web (Streamlit) - Ollama local",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": ["run", "app.py"],
+      "cwd": "${workspaceFolder}",
+      "env": {"PROVEDOR_LLM": "ollama"},
+      "preLaunchTask": "Iniciar Ollama"
+    },
+    {
+      "name": "Terminal - chat (provedor do .env)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--mostrar-sql"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat NVIDIA",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--mostrar-sql", "--provedor", "nvidia"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Terminal - chat Ollama local",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--mostrar-sql", "--provedor", "ollama"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Iniciar Ollama"
+    },
+    {
+      "name": "Terminal - chat auto",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--mostrar-sql", "--provedor", "auto"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Iniciar Ollama"
+    },
+    {
+      "name": "Testar provedores (1 chamada por modelo)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/testar_provedores.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Iniciar Ollama"
+    },
+    {
+      "name": "Avaliação - estimar custo",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/avaliacao/avaliar.py",
+      "args": ["--estimar"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Testes (pytest)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}
