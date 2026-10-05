@@ -10,12 +10,14 @@ automático de cada consulta.
 
 import streamlit as st
 
-from cinedata_agent import config
+from langgraph.checkpoint.memory import InMemorySaver
+
+from cinedata_agent import config, provedores
 from cinedata_agent.agente import AgenteCineData
 from cinedata_agent.banco import banco_disponivel
 from cinedata_agent.graficos import para_dataframe, sugerir_grafico
-from cinedata_agent.llm import consultar_cota, resumo_cota, status_provedores
-from langgraph.checkpoint.memory import InMemorySaver
+from cinedata_agent.llm import consultar_cota, provedor_padrao, resumo_cota, status_provedores
+from interface_config import mostrar_pagina_configuracao
 
 st.set_page_config(page_title="CineData Assistente", page_icon="🎬", layout="wide")
 
@@ -48,14 +50,6 @@ EXEMPLOS = {
         "Quais filmes falam sobre viagem no tempo?",
         "Me indica filmes de terror sobre casas mal-assombradas lançados depois de 2020",
     ],
-}
-
-
-ROTULOS_PROVEDOR = {
-    "auto": "Automático (OpenRouter → NVIDIA → Ollama)",
-    "openrouter": "OpenRouter (modelos :free)",
-    "nvidia": "NVIDIA (build.nvidia.com)",
-    "ollama": "Ollama (modelo local)",
 }
 
 
@@ -132,20 +126,22 @@ iniciar_sessao()
 with st.sidebar:
     st.title("🎬 CineData")
     st.caption("Agente Text-to-SQL sobre a camada Gold")
+    tela = st.radio("Tela", ["💬 Chat", "⚙️ Modelos e chaves"], horizontal=True, label_visibility="collapsed")
 
     status = status_provedores()
-    opcoes = list(ROTULOS_PROVEDOR)
-    padrao = config.PROVEDOR_LLM if config.PROVEDOR_LLM in opcoes else "openrouter"
+    opcoes = list(provedores.VALIDOS)
+    padrao = provedor_padrao() if provedor_padrao() in opcoes else "openrouter"
 
     def _rotulo(p):
         if p == "auto":
-            return ROTULOS_PROVEDOR[p]
-        return ("✅ " if status[p][0] else "⚪ ") + ROTULOS_PROVEDOR[p]
+            return "🔁 Automático (ORDEM_PROVEDORES_AUTO)"
+        return ("✅ " if status[p][0] else "⚪ ") + provedores.obter(p).nome
 
     provedor = st.selectbox("Provedor do LLM", opcoes, index=opcoes.index(padrao), format_func=_rotulo,
-                            help="Dá pra trocar no meio da conversa; a memória é mantida.")
+                            help="Dá pra trocar no meio da conversa; a memória é mantida. "
+                                 "Chaves e modelos: tela 'Modelos e chaves'.")
     if provedor != "auto" and not status[provedor][0]:
-        st.warning(f"{ROTULOS_PROVEDOR[provedor]}: {status[provedor][1]}.")
+        st.warning(f"{provedores.obter(provedor).nome}: {status[provedor][1]}. Configure na tela 'Modelos e chaves'.")
 
     usar_cache = st.toggle("Usar cache de respostas", value=config.CACHE_ATIVO,
                            help="Pergunta repetida não gasta requisição do LLM")
@@ -156,8 +152,8 @@ with st.sidebar:
     if banco_disponivel():
         agente = carregar_agente(provedor)
         st.markdown(f"- Busca semântica: {'✅ ativa' if agente.busca_semantica_ativa else '⚠️ índice não gerado'}")
-        for p, (ok, motivo) in status.items():
-            st.markdown(f"- {p}: {'✅' if ok else '⚪'} {motivo}")
+        disponiveis = [p for p, (ok, _) in status.items() if ok]
+        st.markdown(f"- Provedores disponíveis: {len(disponiveis)} de {len(status)}")
         with st.expander("Modelos (ordem de fallback)"):
             for m in agente.llm.modelos or ["nenhum disponível"]:
                 st.markdown(f"- `{m}`")
@@ -170,6 +166,10 @@ with st.sidebar:
             for p in perguntas:
                 if st.button(p, key=f"ex_{p}", width="stretch"):
                     st.session_state.pergunta_pendente = p
+
+if tela.startswith("⚙️"):
+    mostrar_pagina_configuracao(ao_salvar=carregar_agente.clear)
+    st.stop()
 
 st.title("CineData Assistente")
 st.caption(
