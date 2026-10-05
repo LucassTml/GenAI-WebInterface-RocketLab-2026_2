@@ -30,7 +30,7 @@ import httpx
 from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
 
-from . import config, provedores
+from . import config, ollama_local, provedores
 from .cli_llm import ChatCLI, ErroCLI
 from .guardrails import resposta_parece_valida
 
@@ -74,18 +74,17 @@ def chave_configurada(provedor: str = "openrouter") -> bool:
 
 
 def ollama_rodando(timeout: float = 1.5) -> bool:
-    raiz = config.OLLAMA_BASE_URL.rstrip("/").removesuffix("/v1").replace("localhost", "127.0.0.1")
-    try:
-        return httpx.get(f"{raiz}/api/version", timeout=timeout).status_code == 200
-    except httpx.HTTPError:
-        return False
+    return ollama_local.rodando(timeout)
 
 
 def disponivel(provedor_id: str) -> tuple[bool, str]:
     p = provedores.obter(provedor_id)
     if p.tipo == "ollama":
-        ok = ollama_rodando()
-        return ok, "rodando" if ok else "servidor do Ollama não está rodando"
+        if ollama_rodando():
+            return True, "rodando"
+        if ollama_local.executavel():
+            return True, "instalado (liga sozinho quando for selecionado)"
+        return False, "Ollama não encontrado (https://ollama.com/download)"
     if p.eh_cli:
         caminho = provedores.caminho_cli(provedor_id)
         return bool(caminho), f"instalada ({caminho})" if caminho else f"'{p.comando_cli}' não encontrada no PATH"
@@ -116,7 +115,8 @@ def montar_alvos(provedor: str, modelos: list[str] | None = None) -> list[Alvo]:
     # Ollama rodando). Assim não gasto tentativa com quem nem vai responder.
     alvos = []
     for p in provedores.ordem_auto():
-        if disponivel(p)[0]:
+        # o Ollama só entra no auto se JÁ estiver rodando: o auto nunca liga ele
+        if (ollama_rodando() if p == "ollama" else disponivel(p)[0]):
             alvos.extend(Alvo(p, m) for m in provedores.modelos(p))
     return alvos
 
@@ -201,6 +201,10 @@ class LLMComFallback:
     def __init__(self, ferramentas=None, modelos: list[str] | None = None, provedor: str | None = None):
         self.provedor = (provedor or provedor_padrao()).lower()
         self.alvos = montar_alvos(self.provedor, modelos)
+        self.aviso_ollama = None
+        if self.provedor == "ollama":
+            # só aqui o Ollama é ligado: quando ele é o provedor escolhido
+            self.aviso_ollama = ollama_local.garantir()[1]
         self.modelos = [a.rotulo for a in self.alvos]  # só pra mostrar na interface
         self.ferramentas = list(ferramentas or [])
         self._chats = {}
@@ -371,6 +375,10 @@ def testar_modelo(provedor: str, modelo: str) -> tuple[bool, str]:
 
     from .ferramentas import executar_sql
 
+    if provedor == "ollama":
+        ok, msg = ollama_local.garantir()  # testar o Ollama = escolher o Ollama, então pode ligar
+        if not ok:
+            return False, msg
     try:
         chat = criar_chat(modelo, provedor).bind_tools([executar_sql])
     except ErroLLM as e:
@@ -395,6 +403,7 @@ def listar_modelos_disponiveis(provedor: str) -> list[str]:
 
     p = provedores.obter(provedor)
     if p.tipo == "ollama":
+        ollama_local.garantir()
         raiz = config.OLLAMA_BASE_URL.rstrip("/").removesuffix("/v1").replace("localhost", "127.0.0.1")
         dados = httpx.get(f"{raiz}/api/tags", timeout=5).json()
         return sorted(m["name"] for m in dados.get("models", []))

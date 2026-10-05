@@ -52,6 +52,9 @@ def main():
         print(f"== {pid} ({motivo})")
         if not ok:
             continue
+        if pid == "ollama" and args.provedor != "ollama" and not llm.ollama_rodando():
+            print("  pulei: o Ollama está desligado (ele só liga quando é escolhido; use --provedor ollama)")
+            continue
         for modelo in [args.modelo] if args.modelo else provedores.modelos(pid):
             print(f"  {modelo:<40} ", end="", flush=True)
             funcionou, detalhe = llm.testar_modelo(pid, modelo)

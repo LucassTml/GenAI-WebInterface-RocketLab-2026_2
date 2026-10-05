@@ -30,7 +30,7 @@ COMANDOS = {
     "provedores": ([PY, "main.py", "--listar-provedores"], "lista os 11 provedores e o status de cada um"),
     "testar": ([PY, "scripts/testar_provedores.py"], "testa os modelos (aceita --provedor X, --listar)"),
     "ollama": (["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/iniciar_ollama.ps1"],
-               "inicia o Ollama e baixa o modelo do .env"),
+               "liga o Ollama na mão (fica ligado até você parar)"),
     "cota": ([PY, "scripts/verificar_cota.py"], "cota restante do OpenRouter (não gasta cota)"),
     "modelos-free": ([PY, "scripts/listar_modelos_free.py"], "modelos gratuitos do OpenRouter com tool calling"),
     "avaliar": ([PY, "avaliacao/avaliar.py"], "avaliação automática (aceita --estimar, --provedor, --ids...)"),
