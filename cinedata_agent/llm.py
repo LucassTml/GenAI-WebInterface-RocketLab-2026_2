@@ -1,34 +1,37 @@
 """
 Conexão com o LLM + fallback entre modelos e entre provedores.
 
-OpenRouter, NVIDIA (build.nvidia.com) e Ollama falam a mesma API no formato
-da OpenAI, então dá pra usar o ChatOpenAI do LangChain pros três, só trocando
-a base_url e a chave. Cada "alvo" é um par (provedor, modelo).
+Os provedores estão catalogados em provedores.py. Quatro jeitos de conectar:
+  - API compatível com OpenAI (OpenRouter, NVIDIA, Google Gemini, OpenCode Zen,
+    OpenAI): ChatOpenAI do LangChain trocando só base_url e chave;
+  - Anthropic: SDK oficial da Anthropic via langchain-anthropic;
+  - Ollama: modelo local, também pela API compatível com OpenAI;
+  - CLIs (agy, Claude Code, Codex, OpenCode): ChatCLI, ver cli_llm.py.
+Cada "alvo" é um par (provedor, modelo).
 
 Sobre o fallback (o motivo de existir este arquivo):
 - Modelos :free compartilham capacidade. Quando o provider lota, a API
-  devolve 429 com "provider" no erro. Isso NÃO é a nossa cota, então vale
-  tentar o próximo modelo da lista.
+  devolve 429. Isso NÃO é a nossa cota, então vale tentar o próximo modelo.
 - Quando é a cota diária do OpenRouter (50 req/dia) que acabou, o 429 vem com
   "free-models-per-day". Aí não adianta trocar de modelo DO OPENROUTER: todos
   vão falhar e cada falha CONTA na cota. No modo de um provedor só, paro na
-  hora e aviso. No modo "auto", tiro o OpenRouter da fila e sigo pra NVIDIA
-  e depois pro Ollama local.
-- max_retries=0 no ChatOpenAI: o padrão do LangChain é tentar de novo 2x
-  sozinho, o que queimaria 3 requisições num erro só.
+  hora e aviso. No modo "auto", tiro o OpenRouter da fila e sigo pro próximo.
+- max_retries=0: o padrão do LangChain é tentar de novo 2x sozinho, o que
+  queimaria 3 requisições num erro só.
 - Modelo que deu 429 fica "de castigo" por alguns minutos, pra próxima
   pergunta já começar pelo modelo que está funcionando.
 """
 
+import os
 import time
 from typing import NamedTuple
 
 import httpx
-import openai
 from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
 
-from . import config
+from . import config, provedores
+from .cli_llm import ChatCLI, ErroCLI
 from .guardrails import resposta_parece_valida
 
 PAUSA_MODELO_LOTADO_SEG = 180
@@ -67,93 +70,119 @@ class Alvo(NamedTuple):
 # ------------------------------------------------------------ provedores ---
 
 def chave_configurada(provedor: str = "openrouter") -> bool:
-    if provedor == "ollama":
-        return True  # não usa chave
-    chave = config.NVIDIA_API_KEY if provedor == "nvidia" else config.OPENROUTER_API_KEY
-    return bool(chave) and "COLE_SUA_CHAVE" not in chave
+    return provedores.tem_chave(provedor)
 
 
 def ollama_rodando(timeout: float = 1.5) -> bool:
-    raiz = config.OLLAMA_BASE_URL.rstrip("/").removesuffix("/v1")
+    raiz = config.OLLAMA_BASE_URL.rstrip("/").removesuffix("/v1").replace("localhost", "127.0.0.1")
     try:
         return httpx.get(f"{raiz}/api/version", timeout=timeout).status_code == 200
     except httpx.HTTPError:
         return False
 
 
+def disponivel(provedor_id: str) -> tuple[bool, str]:
+    p = provedores.obter(provedor_id)
+    if p.tipo == "ollama":
+        ok = ollama_rodando()
+        return ok, "rodando" if ok else "servidor do Ollama não está rodando"
+    if p.eh_cli:
+        caminho = provedores.caminho_cli(provedor_id)
+        return bool(caminho), f"instalada ({caminho})" if caminho else f"'{p.comando_cli}' não encontrada no PATH"
+    ok = provedores.tem_chave(provedor_id)
+    return ok, "chave configurada" if ok else f"falta {p.var_chave} no .env"
+
+
 def status_provedores() -> dict[str, tuple[bool, str]]:
     """{provedor: (disponível?, explicação)} — usado na interface e no modo auto."""
-    tem_or, tem_nv, ollama_ok = chave_configurada("openrouter"), chave_configurada("nvidia"), ollama_rodando()
-    return {
-        "openrouter": (tem_or, "chave configurada" if tem_or else "falta OPENROUTER_API_KEY no .env"),
-        "nvidia": (tem_nv, "chave configurada" if tem_nv else "falta NVIDIA_API_KEY no .env"),
-        "ollama": (ollama_ok, "rodando" if ollama_ok else "servidor do Ollama não está rodando"),
-    }
+    return {pid: disponivel(pid) for pid in provedores.IDS}
 
 
 def modelos_do_provedor(provedor: str) -> list[str]:
-    return {
-        "openrouter": config.MODELOS_LLM,
-        "nvidia": config.MODELOS_NVIDIA,
-        "ollama": config.MODELOS_OLLAMA,
-    }[provedor]
+    return provedores.modelos(provedor)
+
+
+def provedor_padrao() -> str:
+    return os.getenv("PROVEDOR_LLM", config.PROVEDOR_LLM).strip().lower()
 
 
 def montar_alvos(provedor: str, modelos: list[str] | None = None) -> list[Alvo]:
-    if provedor not in config.PROVEDORES_VALIDOS:
-        raise ErroLLM(f"PROVEDOR_LLM='{provedor}' não existe. Use um de: {', '.join(config.PROVEDORES_VALIDOS)}.")
+    if provedor not in provedores.VALIDOS:
+        raise ErroLLM(f"PROVEDOR_LLM='{provedor}' não existe. Use um de: {', '.join(provedores.VALIDOS)}.")
     if provedor != "auto":
-        return [Alvo(provedor, m) for m in (modelos or modelos_do_provedor(provedor))]
+        return [Alvo(provedor, m) for m in (modelos or provedores.modelos(provedor))]
 
-    # modo auto: só entra provedor que tem chave (ou, no caso do Ollama, que
-    # está rodando). Assim não gasto tentativa com provedor que nem vai responder.
+    # modo auto: só entra provedor disponível (com chave, CLI instalada ou
+    # Ollama rodando). Assim não gasto tentativa com quem nem vai responder.
     alvos = []
-    for p in config.ORDEM_PROVEDORES_AUTO:
-        if p not in ("openrouter", "nvidia", "ollama"):
-            continue
-        disponivel = ollama_rodando() if p == "ollama" else chave_configurada(p)
-        if disponivel:
-            alvos.extend(Alvo(p, m) for m in modelos_do_provedor(p))
+    for p in provedores.ordem_auto():
+        if disponivel(p)[0]:
+            alvos.extend(Alvo(p, m) for m in provedores.modelos(p))
     return alvos
 
 
-def criar_chat(modelo: str, provedor: str | None = None) -> ChatOpenAI:
-    provedor = provedor or config.PROVEDOR_LLM
-    comum = dict(model=modelo, temperature=config.TEMPERATURA, max_retries=0)
+def criar_chat(modelo: str, provedor: str | None = None):
+    provedor = provedor or provedor_padrao()
+    p = provedores.obter(provedor)
+    timeout = config.TIMEOUT_LLM_SEGUNDOS
 
-    if provedor == "ollama":
+    if p.eh_cli:
+        # "padrao" = deixa a CLI usar o modelo que ela já tem configurado
+        return ChatCLI(ferramenta=p.comando_cli, modelo=None if modelo in ("", "padrao") else modelo,
+                       timeout=max(timeout * 3, 300))
+
+    if p.tipo == "ollama":
         # o Ollama ignora a chave, mas o cliente exige algo; e modelo local
         # numa GPU de notebook é lento, por isso o timeout maior
-        return ChatOpenAI(base_url=config.OLLAMA_BASE_URL, api_key="ollama",
-                          timeout=config.TIMEOUT_LLM_SEGUNDOS * 3, **comum)
+        return ChatOpenAI(model=modelo, base_url=config.OLLAMA_BASE_URL, api_key="ollama",
+                          temperature=config.TEMPERATURA, max_retries=0, timeout=timeout * 3)
 
-    if provedor == "nvidia":
-        if not chave_configurada("nvidia"):
-            raise ChaveInvalida(
-                "A variável NVIDIA_API_KEY não está configurada. Gere a chave em https://build.nvidia.com "
-                "(botão 'Get API Key', começa com nvapi-) e coloque no arquivo .env."
-            )
-        return ChatOpenAI(base_url=config.NVIDIA_BASE_URL, api_key=config.NVIDIA_API_KEY,
-                          timeout=config.TIMEOUT_LLM_SEGUNDOS, **comum)
-
-    if not chave_configurada("openrouter"):
+    chave = provedores.chave(provedor)
+    if not chave:
         raise ChaveInvalida(
-            "A variável OPENROUTER_API_KEY não está configurada. Crie a chave em "
-            "https://openrouter.ai/keys e coloque no arquivo .env (veja o README)."
+            f"A variável {p.var_chave} não está configurada. Gere a chave em {p.site_chave} e coloque no "
+            f".env (ou na tela 'Modelos e chaves' da interface web)."
         )
-    return ChatOpenAI(
-        base_url=config.OPENROUTER_BASE_URL,
-        api_key=config.OPENROUTER_API_KEY,
-        timeout=config.TIMEOUT_LLM_SEGUNDOS,
-        # header opcional que o OpenRouter usa pra identificar o app no painel
-        default_headers={"X-Title": "CineData Agent - Rocket Lab"},
-        **comum,
-    )
 
+    if p.tipo == "anthropic":
+        from langchain_anthropic import ChatAnthropic  # import aqui: só carrega se usar
+
+        # Sem temperature (os modelos Claude atuais recusam) e com max_tokens
+        # explícito: o padrão do langchain-anthropic é o máximo do modelo
+        # (128k), e uma requisição sem streaming desse tamanho dá timeout no SDK.
+        return ChatAnthropic(model=modelo, api_key=chave, max_tokens=16000, max_retries=0, timeout=timeout)
+
+    extra = {"temperature": config.TEMPERATURA} if p.usa_temperatura else {}
+    headers = {"X-Title": "CineData Agent - Rocket Lab"} if provedor == "openrouter" else None
+    return ChatOpenAI(model=modelo, base_url=p.base_url, api_key=chave, max_retries=0, timeout=timeout,
+                      default_headers=headers, **extra)
+
+
+# --------------------------------------------------------- tratamento erro --
 
 def _texto_erro(e: Exception) -> str:
     corpo = getattr(e, "body", None)
     return f"{e} {corpo}".lower()
+
+
+def _tipo_erro(e: Exception) -> str | None:
+    """Classifica erros do SDK da OpenAI, da Anthropic, do httpx e das CLIs.
+    Os dois SDKs usam os mesmos nomes de classe e o atributo status_code."""
+    if isinstance(e, ErroCLI):
+        return "falha"
+    nome = type(e).__name__
+    status = getattr(e, "status_code", None)
+    if nome == "AuthenticationError" or status in (401, 403):
+        return "chave"
+    if status == 429:
+        return "limite"
+    if status == 402:
+        return "credito"
+    if status is not None:
+        return "http"
+    if "Timeout" in nome or "Connection" in nome or isinstance(e, httpx.HTTPError):
+        return "conexao"
+    return None
 
 
 def _resposta_vazia(msg: AIMessage) -> bool:
@@ -163,14 +192,14 @@ def _resposta_vazia(msg: AIMessage) -> bool:
 
 MSG_COTA_OPENROUTER = (
     "A cota diária de modelos gratuitos do OpenRouter acabou (50 requisições/dia). Ela renova à meia-noite "
-    "UTC (21h no horário de Brasília). Enquanto isso dá pra usar respostas do cache ou trocar de provedor: "
-    "PROVEDOR_LLM=nvidia, ollama ou auto."
+    "UTC (21h no horário de Brasília). Enquanto isso dá pra usar respostas do cache ou trocar de provedor "
+    "(PROVEDOR_LLM=auto, nvidia, google, ollama, agy, claude-code...)."
 )
 
 
 class LLMComFallback:
     def __init__(self, ferramentas=None, modelos: list[str] | None = None, provedor: str | None = None):
-        self.provedor = (provedor or config.PROVEDOR_LLM).lower()
+        self.provedor = (provedor or provedor_padrao()).lower()
         self.alvos = montar_alvos(self.provedor, modelos)
         self.modelos = [a.rotulo for a in self.alvos]  # só pra mostrar na interface
         self.ferramentas = list(ferramentas or [])
@@ -209,8 +238,8 @@ class LLMComFallback:
         """Chama o primeiro alvo que responder. Retorna (resposta, "provedor:modelo")."""
         if not self.alvos:
             raise NenhumModeloDisponivel(
-                "Nenhum provedor disponível no modo auto: configure OPENROUTER_API_KEY ou NVIDIA_API_KEY no .env, "
-                "ou inicie o Ollama (scripts/iniciar_ollama.ps1)."
+                "Nenhum provedor disponível no modo auto: configure alguma chave no .env (ou na tela 'Modelos e "
+                "chaves'), inicie o Ollama (scripts/iniciar_ollama.ps1) ou inclua uma CLI em ORDEM_PROVEDORES_AUTO."
             )
         erros, tentativas, pular_agora = [], 0, set()
 
@@ -231,54 +260,55 @@ class LLMComFallback:
             self.requisicoes_feitas += 1
             try:
                 resposta = chat.invoke(mensagens)
-
-            except openai.AuthenticationError:
-                msg = f"O provedor '{alvo.provedor}' recusou a chave (erro 401). Confira a chave no .env."
-                if not self.modo_auto:
-                    raise ChaveInvalida(msg)
-                self._tirar_provedor(alvo.provedor, msg)
-                erros.append(f"{alvo.rotulo}: 401")
-                continue
-            except openai.RateLimitError as e:
+            except Exception as e:  # noqa: BLE001 - classifico abaixo e relanço o que não conheço
+                tipo = _tipo_erro(e)
+                if tipo is None:
+                    raise
                 texto = _texto_erro(e)
-                if alvo.provedor == "openrouter" and ("per-day" in texto or "per day" in texto):
+
+                if tipo == "chave":
+                    msg = f"O provedor '{alvo.provedor}' recusou a chave (erro 401/403). Confira a chave no .env."
                     if not self.modo_auto:
-                        raise CotaDiariaEsgotada(MSG_COTA_OPENROUTER)
-                    self._tirar_provedor("openrouter", "cota diária esgotada")
-                    erros.append(f"{alvo.rotulo}: cota diária esgotada")
-                    continue
-                if "per-min" in texto or "per min" in texto:
+                        raise ChaveInvalida(msg) from None
+                    self._tirar_provedor(alvo.provedor, msg)
+                    erros.append(f"{alvo.rotulo}: chave recusada")
+                elif tipo == "limite":
+                    if alvo.provedor == "openrouter" and ("per-day" in texto or "per day" in texto):
+                        if not self.modo_auto:
+                            raise CotaDiariaEsgotada(MSG_COTA_OPENROUTER) from None
+                        self._tirar_provedor("openrouter", "cota diária esgotada")
+                        erros.append(f"{alvo.rotulo}: cota diária esgotada")
+                    elif "per-min" in texto or "per min" in texto:
+                        if not self.modo_auto:
+                            raise LimitePorMinuto(
+                                "Muitas requisições em sequência (limite por minuto). Espere um minuto e tente de novo."
+                            ) from None
+                        pular_agora.add(alvo.provedor)
+                        erros.append(f"{alvo.rotulo}: limite por minuto")
+                    else:
+                        # provider lotado / rate limit: põe o modelo de castigo e tenta o próximo
+                        self._pausado_ate[alvo.rotulo] = time.time() + PAUSA_MODELO_LOTADO_SEG
+                        erros.append(f"{alvo.rotulo}: 429")
+                elif tipo == "credito":
+                    msg = f"O provedor '{alvo.provedor}' retornou 402 (sem saldo/créditos na conta)."
                     if not self.modo_auto:
-                        raise LimitePorMinuto(
-                            "Muitas requisições em sequência (limite por minuto). Espere um minuto e tente de novo."
-                        )
-                    pular_agora.add(alvo.provedor)
-                    erros.append(f"{alvo.rotulo}: limite por minuto")
-                    continue
-                # provider lotado (OpenRouter) ou rate limit da NVIDIA: próximo
-                self._pausado_ate[alvo.rotulo] = time.time() + PAUSA_MODELO_LOTADO_SEG
-                erros.append(f"{alvo.rotulo}: 429")
-                continue
-            except openai.APIStatusError as e:
-                if e.status_code == 402:
-                    msg = (f"O provedor '{alvo.provedor}' retornou 402 (sem saldo/créditos). Confira a conta "
-                           f"(OpenRouter: openrouter.ai/settings/credits; NVIDIA: build.nvidia.com).")
-                    if not self.modo_auto:
-                        raise ErroLLM(msg)
+                        raise ErroLLM(msg) from None
                     self._tirar_provedor(alvo.provedor, msg)
                     erros.append(f"{alvo.rotulo}: 402")
-                    continue
-                # 404 (modelo saiu do ar / sem suporte a tools), 5xx, 400 etc.
-                self._pausado_ate[alvo.rotulo] = time.time() + PAUSA_MODELO_LOTADO_SEG
-                erros.append(f"{alvo.rotulo}: HTTP {e.status_code}")
-                continue
-            except (openai.APITimeoutError, openai.APIConnectionError, httpx.HTTPError) as e:
-                if alvo.provedor == "ollama":
-                    erros.append(f"{alvo.rotulo}: não consegui falar com o Ollama em {config.OLLAMA_BASE_URL} "
-                                 f"(ele está rodando?)")
-                    pular_agora.add("ollama")
-                else:
-                    erros.append(f"{alvo.rotulo}: {type(e).__name__}")
+                elif tipo == "http":
+                    # 404 (modelo não existe / sem tools), 5xx, 400...
+                    self._pausado_ate[alvo.rotulo] = time.time() + PAUSA_MODELO_LOTADO_SEG
+                    erros.append(f"{alvo.rotulo}: HTTP {getattr(e, 'status_code', '?')}")
+                elif tipo == "falha":
+                    erros.append(f"{alvo.rotulo}: {e}")
+                    pular_agora.add(alvo.provedor)  # CLI quebrada: não adianta tentar outro modelo dela agora
+                else:  # conexao
+                    if alvo.provedor == "ollama":
+                        erros.append(f"{alvo.rotulo}: não consegui falar com o Ollama em {config.OLLAMA_BASE_URL} "
+                                     f"(ele está rodando?)")
+                        pular_agora.add("ollama")
+                    else:
+                        erros.append(f"{alvo.rotulo}: {type(e).__name__}")
                 continue
 
             if _resposta_vazia(resposta):
@@ -291,28 +321,26 @@ class LLMComFallback:
             return resposta, alvo.rotulo
 
         # chegou aqui: ninguém respondeu
-        provedores = {a.provedor for a in self.alvos}
-        if provedores and all(self._provedores_fora.get(p) == "cota diária esgotada" for p in provedores):
+        provs = {a.provedor for a in self.alvos}
+        if provs and all(self._provedores_fora.get(p) == "cota diária esgotada" for p in provs):
             raise CotaDiariaEsgotada(MSG_COTA_OPENROUTER)
         motivos = [f"{p}: {m}" for p, m in self._provedores_fora.items()]
         raise NenhumModeloDisponivel(
             "Nenhum modelo conseguiu responder agora. Tentativas: "
             + "; ".join(erros + motivos)
-            + ". Espere alguns minutos, troque os modelos no .env ou use outro provedor (PROVEDOR_LLM)."
+            + ". Espere alguns minutos, troque os modelos ou use outro provedor (PROVEDOR_LLM)."
         )
 
 
 def consultar_cota(timeout: float = 10) -> dict:
     """Consulta o endpoint /key do OpenRouter (não é chamada de modelo, não gasta cota).
     Retorna o JSON de "data" ou {"erro": "..."}."""
-    if not chave_configurada("openrouter"):
+    chave = provedores.chave("openrouter")
+    if not chave:
         return {"erro": "OPENROUTER_API_KEY não configurada no .env"}
     try:
-        r = httpx.get(
-            f"{config.OPENROUTER_BASE_URL}/key",
-            headers={"Authorization": f"Bearer {config.OPENROUTER_API_KEY}"},
-            timeout=timeout,
-        )
+        r = httpx.get(f"{config.OPENROUTER_BASE_URL}/key", headers={"Authorization": f"Bearer {chave}"},
+                      timeout=timeout)
         r.raise_for_status()
         return r.json().get("data", {})
     except httpx.HTTPStatusError as e:
@@ -329,3 +357,62 @@ def resumo_cota(dados: dict) -> str:
         return f"{free.get('used', '?')} usadas de {free.get('limit', '?')} hoje (restam {free['remaining']})"
     # se o formato mudar, mostra o que veio mesmo
     return f"limite={dados.get('limit')} uso={dados.get('usage')} free_tier={dados.get('is_free_tier')}"
+
+
+# ------------------------------------------- ferramentas da tela de config --
+
+PERGUNTA_TESTE = "Quantos gêneros de filme existem no catálogo? Use a ferramenta executar_sql (tabela dim_genres)."
+
+
+def testar_modelo(provedor: str, modelo: str) -> tuple[bool, str]:
+    """Faz UMA chamada com tool calling e diz se o modelo serve pro agente
+    (usado pela tela 'Modelos e chaves' e por scripts/testar_provedores.py)."""
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    from .ferramentas import executar_sql
+
+    try:
+        chat = criar_chat(modelo, provedor).bind_tools([executar_sql])
+    except ErroLLM as e:
+        return False, str(e)
+    inicio = time.time()
+    try:
+        resposta = chat.invoke([SystemMessage("Você é um agente que responde consultando um banco SQLite."),
+                                HumanMessage(PERGUNTA_TESTE)])
+    except Exception as e:  # noqa: BLE001 - aqui eu quero mostrar qualquer erro
+        codigo = getattr(e, "status_code", "")
+        return False, f"erro {type(e).__name__} {codigo}: {str(e)[:200]}".strip()
+    tempo = time.time() - inicio
+    if resposta.tool_calls:
+        sql = str(resposta.tool_calls[0]["args"].get("consulta", ""))[:80]
+        return True, f"OK em {tempo:.1f}s, pediu a ferramenta: {sql}"
+    return False, f"respondeu só com texto em {tempo:.1f}s (não usou a ferramenta, não serve pro agente)"
+
+
+def listar_modelos_disponiveis(provedor: str) -> list[str]:
+    """Pergunta pro próprio provedor quais modelos a conta enxerga."""
+    import subprocess
+
+    p = provedores.obter(provedor)
+    if p.tipo == "ollama":
+        raiz = config.OLLAMA_BASE_URL.rstrip("/").removesuffix("/v1").replace("localhost", "127.0.0.1")
+        dados = httpx.get(f"{raiz}/api/tags", timeout=5).json()
+        return sorted(m["name"] for m in dados.get("models", []))
+    if p.id == "agy":
+        caminho = provedores.caminho_cli("agy")
+        if not caminho:
+            return []
+        saida = subprocess.run([caminho, "models"], capture_output=True, timeout=60).stdout.decode("utf-8", "replace")
+        return [linha.split()[0] for linha in saida.splitlines() if linha.strip() and "\t" in linha]
+    if p.eh_cli:
+        return []  # claude/codex/opencode: usar "padrao" ou digitar o nome
+    chave = provedores.chave(provedor)
+    if not chave:
+        raise ChaveInvalida(f"Configure a {p.var_chave} primeiro.")
+    if p.tipo == "anthropic":
+        import anthropic
+
+        return [m.id for m in anthropic.Anthropic(api_key=chave).models.list()]
+    r = httpx.get(f"{p.base_url.rstrip('/')}/models", headers={"Authorization": f"Bearer {chave}"}, timeout=20)
+    r.raise_for_status()
+    return sorted(m["id"] for m in r.json().get("data", []))

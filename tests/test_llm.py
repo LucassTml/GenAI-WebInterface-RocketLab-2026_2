@@ -8,7 +8,7 @@ import openai
 import pytest
 from langchain_core.messages import AIMessage
 
-from cinedata_agent import config, llm
+from cinedata_agent import llm
 
 
 def _erro(classe, status, mensagem):
@@ -100,12 +100,12 @@ def test_resposta_degenerada_tenta_outro(chats):
 def chats_por_provedor(monkeypatch):
     mapa = {}
     monkeypatch.setattr(llm, "criar_chat", lambda modelo, provedor=None: mapa[(provedor, modelo)])
-    monkeypatch.setattr(config, "OPENROUTER_API_KEY", "sk-or-v1-teste")
-    monkeypatch.setattr(config, "NVIDIA_API_KEY", "nvapi-teste")
-    monkeypatch.setattr(config, "MODELOS_LLM", ["or-a:free", "or-b:free"])
-    monkeypatch.setattr(config, "MODELOS_NVIDIA", ["nv-a"])
-    monkeypatch.setattr(config, "MODELOS_OLLAMA", ["local"])
-    monkeypatch.setattr(config, "ORDEM_PROVEDORES_AUTO", ["openrouter", "nvidia", "ollama"])
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-teste")
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-teste")
+    monkeypatch.setenv("MODELOS_LLM", "or-a:free,or-b:free")
+    monkeypatch.setenv("MODELOS_NVIDIA", "nv-a")
+    monkeypatch.setenv("OLLAMA_MODELO", "local")
+    monkeypatch.setenv("ORDEM_PROVEDORES_AUTO", "openrouter,nvidia,ollama")
     monkeypatch.setattr(llm, "ollama_rodando", lambda timeout=1.5: True)
     return mapa
 
@@ -116,7 +116,7 @@ def test_auto_monta_fila_com_todos_os_provedores(chats_por_provedor):
 
 
 def test_auto_ignora_provedor_sem_chave_e_ollama_parado(chats_por_provedor, monkeypatch):
-    monkeypatch.setattr(config, "NVIDIA_API_KEY", "")
+    monkeypatch.setenv("NVIDIA_API_KEY", "")
     monkeypatch.setattr(llm, "ollama_rodando", lambda timeout=1.5: False)
     cliente = llm.LLMComFallback(provedor="auto")
     assert cliente.modelos == ["openrouter:or-a:free", "openrouter:or-b:free"]
@@ -151,3 +151,22 @@ def test_auto_chave_recusada_pula_provedor(chats_por_provedor):
 def test_provedor_invalido():
     with pytest.raises(llm.ErroLLM):
         llm.LLMComFallback(provedor="chatgpt")
+
+
+def test_erro_da_anthropic_tambem_e_classificado():
+    import anthropic
+
+    resposta = httpx.Response(429, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+    erro = anthropic.RateLimitError("rate limited", response=resposta, body=None)
+    assert llm._tipo_erro(erro) == "limite"
+
+
+def test_criar_chat_cli_usa_modelo_padrao_da_ferramenta():
+    chat = llm.criar_chat("padrao", "claude-code")
+    assert chat.ferramenta == "claude" and chat.modelo is None
+
+
+def test_sem_chave_da_mensagem_com_o_site(monkeypatch):
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    with pytest.raises(llm.ChaveInvalida, match="aistudio.google.com"):
+        llm.criar_chat("gemini-flash-latest", "google")
