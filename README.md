@@ -136,6 +136,17 @@ python scripts/indexar_sinopses.py
 Sem o índice o agente funciona normalmente, só usa `LIKE` na sinopse no lugar da busca semântica.
 
 ### 7. Rodar
+O jeito mais simples é o atalho `cinedata`, que usa o Python do `.venv` sozinho (não precisa ativar nada nem
+estar com o ambiente ligado):
+```powershell
+.\cinedata web                  # interface web
+.\cinedata web --provedor agy   # interface web já usando o agy
+.\cinedata chat                 # chat no terminal
+.\cinedata provedores           # provedores disponíveis
+.\cinedata                      # todos os comandos
+```
+Estando na pasta de cima, use `.\cinedata-agent\cinedata web`. Ou, com o `.venv` ativado, os comandos abaixo.
+
 Interface web:
 ```bash
 streamlit run app.py

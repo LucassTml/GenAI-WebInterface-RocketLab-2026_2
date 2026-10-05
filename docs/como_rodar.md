@@ -34,6 +34,25 @@ da fila e o agente passa pro próximo.
 
 ---
 
+## Como abrir o projeto: o atalho `cinedata`
+Não precisa ativar o `.venv` nem estar na pasta certa: o `cinedata.cmd` usa o Python do ambiente virtual sozinho
+(e cria o `.venv` se ainda não existir).
+
+```powershell
+cd C:\Users\melt9\Documents\Codes\AtvGenAi\cinedata-agent
+.\cinedata web                          # interface web
+.\cinedata web --provedor agy           # interface web já usando o agy
+.\cinedata chat --provedor claude-code  # chat no terminal
+.\cinedata chat "Quais são os 5 filmes mais populares?"
+.\cinedata provedores                   # o que está disponível
+.\cinedata testar --provedor google     # testa os modelos de um provedor
+.\cinedata ollama                       # inicia o Ollama
+.\cinedata                              # lista todos os comandos
+```
+Estando na pasta de cima (`AtvGenAi`), use `.\cinedata-agent\cinedata web`.
+
+---
+
 ## Três jeitos de configurar (escolha um)
 
 ### 1. Pela interface web (mais fácil)
