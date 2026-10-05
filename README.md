@@ -39,7 +39,7 @@ CineData> O gênero com maior margem de lucro média é Horror, com 75,92%.
 **Extras que implementei**
 | Extra | Onde | Resumo |
 |---|---|---|
-| Guardrails em 3 camadas | `guardrails.py`, `banco.py` | pergunta (injection / pedido de escrita) → SQL (só SELECT) → banco read-only com *authorizer* |
+| Guardrails de entrada, SQL e saída | `guardrails.py`, `banco.py` | pergunta (injection / pedido de escrita) → SQL (só SELECT) → banco read-only com *authorizer* → resposta (raciocínio vazado / texto degenerado aciona o fallback) |
 | Fallback entre modelos gratuitos | `llm.py` | se um modelo está lotado (429), tenta o próximo; se a cota acabou, para na hora |
 | Cache de respostas | `cache.py` | pergunta repetida não gasta requisição |
 | Memória de conversa | `agente.py` | "e qual foi o segundo?" funciona |
@@ -47,7 +47,7 @@ CineData> O gênero com maior margem de lucro média é Horror, com 75,92%.
 | Interface visual + gráficos | `app.py`, `graficos.py` | chat em Streamlit com tabela, SQL e gráfico automático |
 | Avaliação com respostas esperadas | `avaliacao/` | 17 perguntas com SQL de referência e nota automática |
 | Análise exploratória | `notebooks/exploracao_dados.ipynb` | as "pegadinhas" dos dados que viraram regras do prompt |
-| Testes automatizados | `tests/` | 70 testes, rodam sem gastar cota (LLM falso) |
+| Testes automatizados | `tests/` | 75 testes, rodam sem gastar cota (LLM falso) |
 | Modelo local (opcional) | `llm.py` | mesmo código roda com Ollama quando a cota acaba |
 
 ## Como funciona
@@ -192,6 +192,33 @@ com 5 perguntas o de 3B acertou 4), então servem mais para testar o fluxo.
 
 ## Avaliação automática
 
+### Resultado com o OpenRouter (05/10/2026)
+
+**17 de 17 perguntas certas** com `nvidia/nemotron-3.5-lightning:free`, a ~2 requisições por pergunta.
+Relatório completo, com o SQL gerado e a resposta de cada pergunta:
+[`avaliacao/resultados/avaliacao_final.md`](avaliacao/resultados/avaliacao_final.md).
+
+| Categoria | Certas |
+|---|---|
+| Bilheteria e Finanças | 3/3 |
+| Popularidade e Engajamento | 3/3 |
+| Elenco e Equipe | 3/3 |
+| Gêneros e Produtoras | 3/3 |
+| Avaliações dos Usuários | 2/2 |
+| Busca semântica | 1/1 |
+| Guardrails (pedido de escrita e pergunta fora do escopo) | 2/2 |
+
+O que aconteceu no caminho (está registrado no relatório):
+- Na rodada completa deu **16/17**. Na `fin_02` (lucro médio por gênero) os valores estavam certos, mas o agente
+  pôs `LIMIT 10` e mostrou só 10 dos 19 gêneros. Deixei explícito no prompt que agregações por gênero/ano trazem
+  todas as categorias.
+- Refazendo, os dados vieram certos mas o modelo **vazou o raciocínio em inglês e o texto degenerou**. A nota por
+  dados não pegava isso, então criei um **guardrail de saída** (`resposta_parece_valida`): resposta degenerada
+  aciona o fallback para outro modelo, e a avaliação passou a reprovar texto degenerado mesmo com dados certos.
+- Duas perguntas (`pop_01` e `ava_01`) vieram do cache, de testes feitos antes com o mesmo modelo.
+
+### Como rodar
+
 `avaliacao/perguntas.yaml` tem as **14 perguntas do enunciado + 3 de comportamento** (busca
 semântica, guardrail e pergunta fora do escopo), cada uma com um SQL de referência conferido à mão.
 A nota compara o **resultado** da consulta do agente com o do gabarito (*execution accuracy*), com
@@ -214,7 +241,7 @@ rodar de novo não gasta nada.
 pip install -r requirements-dev.txt
 pytest
 ```
-São 70 testes cobrindo guardrails, segurança do banco (inclusive tentando burlar a validação),
+São 75 testes cobrindo guardrails, segurança do banco (inclusive tentando burlar a validação),
 timeout, fallback entre modelos, cache, memória, limite de chamadas e o comparador da avaliação.
 Os testes do agente usam um **LLM falso**, então não gastam cota.
 

@@ -108,6 +108,10 @@ para ele escrever a resposta com o resultado.
    pelo próprio SQLite (tem teste para isso em `tests/test_banco.py`).
 4. **Timeout** de 90 s por consulta (via `progress_handler`) e limite de linhas lidas.
 5. O prompt instrui o modelo a recusar perguntas fora do catálogo.
+6. **Saída** (`guardrails.resposta_parece_valida`): criado depois da avaliação real. Numa resposta o modelo
+   gratuito vazou o raciocínio em inglês ("The user asked: ...") e terminou gerando lixo. Medi dois sinais nas 17
+   respostas reais — começo com raciocínio em inglês e letras soltas sem sentido (49 na resposta quebrada, no
+   máximo 2 nas boas) — e uso os dois: se a resposta final parecer degenerada, o fallback tenta outro modelo.
 
 ---
 
@@ -150,7 +154,12 @@ certos para a mesma pergunta. Para ser justo:
   de "titulo");
 - números com tolerância de 1% e escalas diferentes (margem 0,75 ou 75%; receita em bilhões);
 - quando o ranking tem empate (ex.: 7 filmes com 9 avaliações), comparo só os valores;
-- quando a pergunta é ambígua (moeda do "lucro médio"), aceito alternativas.
+- quando a pergunta é ambígua (moeda do "lucro médio"), aceito alternativas;
+- e, além dos dados, o texto final precisa passar no guardrail de saída (resposta degenerada reprova).
+
+**Resultado (05/10/2026, `nvidia/nemotron-3.5-lightning:free`): 17/17.** A rodada completa deu 16/17; a
+`fin_02` foi refeita depois de dois ajustes que a própria avaliação revelou (LIMIT em agregação por gênero e texto
+degenerado). Detalhes em `avaliacao/resultados/avaliacao_final.md`.
 
 ---
 
