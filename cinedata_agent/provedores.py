@@ -22,6 +22,14 @@ from . import config
 ARQUIVO_ENV = config.RAIZ / ".env"
 
 
+SELO_BETA = "🧪 beta"
+AVISO_BETA = (
+    "🧪 **Provedor em beta.** Só o OpenRouter passou pela avaliação completa do projeto (17/17). Este provedor "
+    "funcionou nos testes rápidos, mas ainda pode errar o SQL, demorar ou falhar. Se der problema, volte para o "
+    "OpenRouter."
+)
+
+
 @dataclass(frozen=True)
 class Provedor:
     id: str
@@ -35,6 +43,13 @@ class Provedor:
     site_chave: str | None = None
     comando_cli: str | None = None
     usa_temperatura: bool = True  # modelos de raciocínio recusam temperature != padrão
+    # Só o OpenRouter foi avaliado de verdade (17/17). Os outros funcionaram no
+    # teste rápido, mas ainda não passaram pela avaliação completa: ficam "beta".
+    beta: bool = True
+
+    @property
+    def nome_com_selo(self) -> str:
+        return f"{self.nome} {SELO_BETA}" if self.beta else self.nome
 
     @property
     def eh_cli(self) -> bool:
@@ -48,7 +63,7 @@ PROVEDORES: dict[str, Provedor] = {p.id: p for p in [
         "nvidia/nemotron-3.5-lightning:free,qwen/qwen3.8-27b:free,google/gemma-4-31b-it:free,openrouter/free",
         "Gratuito, 50 requisições/dia. Foi o provedor usado na avaliação (17/17).",
         var_chave="OPENROUTER_API_KEY", base_url="https://openrouter.ai/api/v1",
-        site_chave="https://openrouter.ai/keys",
+        site_chave="https://openrouter.ai/keys", beta=False,
     ),
     Provedor(
         "nvidia", "NVIDIA (build.nvidia.com)", "openai", "MODELOS_NVIDIA",
@@ -168,3 +183,8 @@ def salvar_no_env(variavel: str, valor: str) -> None:
     Path(ARQUIVO_ENV).touch(exist_ok=True)
     set_key(str(ARQUIVO_ENV), variavel, valor, quote_mode="never")
     os.environ[variavel] = valor
+
+
+def eh_beta(provedor_id: str) -> bool:
+    """O modo auto também conta como beta, porque pode cair num provedor beta."""
+    return provedor_id == "auto" or obter(provedor_id).beta

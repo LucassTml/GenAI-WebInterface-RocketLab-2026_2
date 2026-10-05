@@ -95,7 +95,7 @@ def main():
         from cinedata_agent.llm import status_provedores
 
         for pid, (ok, motivo) in status_provedores().items():
-            print(f"{'OK ' if ok else '-- '} {pid:<14} {provedores.obter(pid).nome:<32} {motivo}")
+            print(f"{'OK ' if ok else '-- '} {pid:<14} {provedores.obter(pid).nome_com_selo:<40} {motivo}")
         return
 
     if not banco_disponivel():
@@ -107,6 +107,10 @@ def main():
         usar_cache=False if args.sem_cache else None,
     )
     id_conversa = agente.nova_conversa()
+    if agente.llm.aviso_ollama:
+        print(f"🦙 {agente.llm.aviso_ollama}")
+    if provedores.eh_beta(agente.llm.provedor):
+        print("🧪 Provedor em beta: só o OpenRouter passou pela avaliação completa. Pode errar ou falhar mais.")
 
     if args.pergunta:
         responder(agente, " ".join(args.pergunta), id_conversa, args.mostrar_sql)

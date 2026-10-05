@@ -12,7 +12,7 @@ import streamlit as st
 
 from langgraph.checkpoint.memory import InMemorySaver
 
-from cinedata_agent import config, provedores
+from cinedata_agent import config, ollama_local, provedores
 from cinedata_agent.agente import AgenteCineData
 from cinedata_agent.banco import banco_disponivel
 from cinedata_agent.graficos import para_dataframe, sugerir_grafico
@@ -134,12 +134,22 @@ with st.sidebar:
 
     def _rotulo(p):
         if p == "auto":
-            return "🔁 Automático (ORDEM_PROVEDORES_AUTO)"
-        return ("✅ " if status[p][0] else "⚪ ") + provedores.obter(p).nome
+            return f"🔁 Automático (ORDEM_PROVEDORES_AUTO) {provedores.SELO_BETA}"
+        return ("✅ " if status[p][0] else "⚪ ") + provedores.obter(p).nome_com_selo
 
     provedor = st.selectbox("Provedor do LLM", opcoes, index=opcoes.index(padrao), format_func=_rotulo,
                             help="Dá pra trocar no meio da conversa; a memória é mantida. "
                                  "Chaves e modelos: tela 'Modelos e chaves'.")
+    if provedor == "ollama":
+        # o Ollama só liga quando é escolhido, e desliga quando o programa fecha
+        if not ollama_local.rodando():
+            with st.spinner("Ligando o Ollama (na primeira vez leva ~35 s)..."):
+                ok_ollama, msg_ollama = ollama_local.garantir()
+            (st.success if ok_ollama else st.error)(msg_ollama)
+        elif ollama_local.iniciado_por_mim():
+            st.caption("🦙 Ollama ligado por este programa: desliga quando você fechar.")
+    if provedores.eh_beta(provedor):
+        st.warning(provedores.AVISO_BETA)
     if provedor != "auto" and not status[provedor][0]:
         st.warning(f"{provedores.obter(provedor).nome}: {status[provedor][1]}. Configure na tela 'Modelos e chaves'.")
 

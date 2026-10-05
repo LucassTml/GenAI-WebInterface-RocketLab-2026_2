@@ -30,7 +30,7 @@ def _salvar(variavel: str, valor: str, ao_salvar):
 def _bloco_provedor(pid: str, status: dict, ao_salvar):
     p = provedores.obter(pid)
     ok, motivo = status[pid]
-    with st.expander(f"{'✅' if ok else '⚪'} {p.nome}  ·  `{pid}`", expanded=False):
+    with st.expander(f"{'✅' if ok else '⚪'} {p.nome_com_selo}  ·  `{pid}`", expanded=False):
         st.caption(p.descricao)
         st.markdown(f"**Status:** {motivo}")
 
@@ -95,6 +95,8 @@ def mostrar_pagina_configuracao(ao_salvar):
         "Tudo que você salvar aqui vai para o arquivo .env do projeto. Chaves de API ficam só no seu PC "
         "(o .env está no .gitignore e nunca vai pro GitHub)."
     )
+    st.info("Os provedores marcados com 🧪 beta ainda não passaram pela avaliação completa (só o OpenRouter, "
+            "que acertou 17/17). Eles funcionam, mas podem errar ou falhar mais.", icon="🧪")
     status = llm.status_provedores()
 
     st.subheader("Provedor padrão")
@@ -103,7 +105,7 @@ def mostrar_pagina_configuracao(ao_salvar):
     novo = st.selectbox("Usado quando o programa abre (PROVEDOR_LLM)", opcoes,
                         index=opcoes.index(atual) if atual in opcoes else 0,
                         format_func=lambda x: "auto (tenta vários em sequência)" if x == "auto"
-                        else f"{'✅' if status[x][0] else '⚪'} {provedores.obter(x).nome}")
+                        else f"{'✅' if status[x][0] else '⚪'} {provedores.obter(x).nome_com_selo}")
     if novo != atual and st.button("Salvar provedor padrão"):
         _salvar("PROVEDOR_LLM", novo, ao_salvar)
         st.success(f"Provedor padrão: {novo}")
